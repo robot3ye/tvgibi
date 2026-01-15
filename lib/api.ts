@@ -24,8 +24,9 @@ const mapProgram = (dbProgram: any): Program => {
         return `${h}:${m}`;
     };
 
-    // Format YYYY-MM-DD
-    const dateStr = startDate.toISOString().split('T')[0];
+    // Format YYYY-MM-DD (Local Time)
+    // We use 'en-CA' because it outputs YYYY-MM-DD format which is what we need for sorting/filtering strings
+    const dateStr = startDate.toLocaleDateString('en-CA'); 
 
     return {
         id: dbProgram.id,
@@ -108,6 +109,98 @@ export const getProgramsForDate = async (date: string): Promise<Program[]> => {
         
         return p;
     });
+};
+
+export const addProgram = async (program: any) => {
+    const { data, error } = await supabase
+        .from('programs')
+        .insert(program)
+        .select()
+        .single();
+    
+    if (error) {
+        console.error('Error adding program:', error);
+        throw error;
+    }
+    return data;
+};
+
+export const deleteProgram = async (programId: string) => {
+    const { error } = await supabase
+        .from('programs')
+        .delete()
+        .eq('id', programId);
+    
+    if (error) {
+        console.error('Error deleting program:', error);
+        throw error;
+    }
+};
+
+export const deletePrograms = async (programIds: string[]) => {
+    const { error } = await supabase
+        .from('programs')
+        .delete()
+        .in('id', programIds);
+    
+    if (error) {
+        console.error('Error deleting programs:', error);
+        throw error;
+    }
+};
+
+export const updateProgram = async (programId: string, updates: any) => {
+    const { data, error } = await supabase
+        .from('programs')
+        .update(updates)
+        .eq('id', programId)
+        .select()
+        .single();
+        
+    if (error) {
+        console.error('Error updating program:', error);
+        throw error;
+    }
+    return data;
+};
+
+export const getLastProgram = async (channelId: string) => {
+    const { data, error } = await supabase
+        .from('programs')
+        .select('*')
+        .eq('channel_id', channelId)
+        .order('end_time', { ascending: false })
+        .limit(1)
+        .single();
+        
+    if (error && error.code !== 'PGRST116') {
+        console.error('Error fetching last program:', error);
+    }
+    
+    return data;
+};
+
+export const getProgramsForChannel = async (channelId: string) => {
+    // Fetch ALL programs for the channel, or at least a wider range to support Admin view of past days
+    // Admin panel filtering is done client-side, so we need to fetch enough data.
+    // Let's fetch past 7 days and future 7 days for now to be safe and cover "Today" properly even if it's late at night.
+    
+    const now = new Date();
+    const startFilter = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString(); // 7 days ago
+    
+    const { data, error } = await supabase
+        .from('programs')
+        .select('*')
+        .eq('channel_id', channelId)
+        .gte('end_time', startFilter)
+        .order('start_time', { ascending: true });
+        
+    if (error) {
+        console.error('Error fetching channel programs:', error);
+        return [];
+    }
+    
+    return data.map(mapProgram);
 };
 
 export const getCurrentProgram = async (channelId: string): Promise<{ current: Program | null, next: Program | null, offset: number }> => {

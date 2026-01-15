@@ -39,6 +39,19 @@ async function seedDatabase() {
   }
   console.log(`Channel '${channel.name}' upserted.`);
 
+  // 1.5. Cleanup existing programs for this channel
+  console.log(`Cleaning up existing programs for channel '${channel.id}'...`);
+  const { error: deleteError } = await supabase
+    .from('programs')
+    .delete()
+    .eq('channel_id', channel.id);
+  
+  if (deleteError) {
+      console.error('Error cleaning up programs:', deleteError);
+      return;
+  }
+  console.log('Cleanup complete.');
+
   // 2. Read JSON Data
   const jsonPath = path.resolve(__dirname, '../data/channel-musicbox.json');
   const fileContent = fs.readFileSync(jsonPath, 'utf-8');
@@ -55,7 +68,7 @@ async function seedDatabase() {
   startDate.setHours(0, 0, 0, 0);
 
   let currentTime = new Date(startDate);
-  const daysToSchedule = 4; // Cover Yesterday + 3 days ahead
+  const daysToSchedule = 10; // Cover Yesterday + 9 days ahead
   const endDate = new Date(startDate);
   endDate.setDate(endDate.getDate() + daysToSchedule);
 
