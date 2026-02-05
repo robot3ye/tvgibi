@@ -21,6 +21,7 @@ export interface Program {
   isLive?: boolean;
   category?: 'movie' | 'news' | 'sports' | 'kids' | 'documentary' | 'entertainment';
   videoId: string; // YouTube Video ID
+  duration: number; // Duration in seconds
 }
 
 export interface HeroContent {
@@ -166,7 +167,8 @@ const generatePrograms = (): Program[] => {
                 description: `TechVision özel yayını: ${item.title}`,
                 isLive: false,
                 category: item.category as any, // eslint-disable-line @typescript-eslint/no-explicit-any
-                videoId: item.videoId
+                videoId: item.videoId,
+                duration: item.durationM * 60 // Convert minutes to seconds
             });
         });
         return;
@@ -217,7 +219,8 @@ const generatePrograms = (): Program[] => {
                   thumbnail: video['Thumbnail url'],
                   isLive: false,
                   category: 'entertainment',
-                  videoId: videoId
+                  videoId: videoId,
+                  duration: durationSeconds
               });
 
               // Advance time and index
@@ -266,7 +269,8 @@ const generatePrograms = (): Program[] => {
           description: `Bu programda ${title.toLowerCase()} hakkında en güncel bilgiler yer alıyor.`,
           isLive: false,
           category: category as any, // eslint-disable-line @typescript-eslint/no-explicit-any
-          videoId
+          videoId,
+          duration: duration * 60 // Convert minutes to seconds
         });
 
         currentHour = endHour;

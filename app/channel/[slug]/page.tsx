@@ -45,9 +45,12 @@ export default function ChannelPage({ params }: PageProps) {
         const { current, next, offset } = await getCurrentProgram(channel.id);
         
         if (current) {
+             // Use the offset returned from API which is calculated based on start_time
+             // Or verify it matches current local time
+             
              if (lastProgramIdRef.current !== current.id) {
                 lastProgramIdRef.current = current.id;
-                setInitialOffset(offset);
+                setInitialOffset(offset); // API calculates this correctly
                 setCurrentProgram(current);
                 setNextProgram(next);
             }

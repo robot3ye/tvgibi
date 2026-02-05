@@ -40,6 +40,7 @@ const mapProgram = (dbProgram: any): Program => {
         isLive: false, // Calculated on frontend usually, or we can check here
         category: 'entertainment', // Default or add to DB
         videoId: dbProgram.video_id,
+        duration: dbProgram.duration,
     };
 };
 
@@ -203,44 +204,134 @@ export const getProgramsForChannel = async (channelId: string) => {
     return data.map(mapProgram);
 };
 
-export const getCurrentProgram = async (channelId: string): Promise<{ current: Program | null, next: Program | null, offset: number }> => {
-    const now = new Date().toISOString();
+export const reorderPrograms = async (programs: Program[], startTimeIso?: string) => {
+    if (programs.length === 0) return;
+
+    let anchorDate: Date;
+
+    if (startTimeIso) {
+        anchorDate = new Date(startTimeIso);
+    } else {
+        // Fallback: Use the first program's current start time as the anchor
+        const p = programs[0];
+        const [h, m] = p.startTime.split(':').map(Number);
+        const d = new Date(p.date); 
+        d.setHours(h, m, 0, 0);
+        anchorDate = d;
+    }
+
+    // Set 24h Boundary based on Anchor Date (00:00 - 23:59:59 of that day)
+    const dayStart = new Date(anchorDate);
+    dayStart.setHours(0, 0, 0, 0);
     
-    // Get current program
+    const dayEnd = new Date(dayStart);
+    dayEnd.setHours(23, 59, 59, 999);
+
+    const updates = [];
+    let currentStart = anchorDate;
+
+    for (const prog of programs) {
+        // Calculate new End Time
+        const durationMs = prog.duration * 1000;
+        let newEndTime = new Date(currentStart.getTime() + durationMs);
+
+        // --- Overflow Check ---
+        // If start time is already beyond day end, we stop scheduling this and subsequent items?
+        // Or we clamp them?
+        // Requirement: "Seçili gün için yaptığı tüm ekleme/çıkarma/sıralama değişiklikleri bir sonraki günü etkilemesin."
+        
+        // If a program goes beyond 23:59:59, we let it finish naturally in DB (so it plays),
+        // BUT we must ensure the *Next Day's* programs are NOT pushed by this.
+        // Since we are only reordering 'programs' list which is filtered by 'selectedDate' in frontend,
+        // we are implicitly only touching today's items.
+        
+        // However, if we push a video so it ends at 00:15 tomorrow, 
+        // does it conflict with tomorrow's 00:00 video?
+        // Yes, in a continuous stream it would. 
+        // But in "Broadcast Day" logic, tomorrow starts at 00:00 fresh.
+        // So this overflow is acceptable as "Sarkma" (Overrun), 
+        // OR we enforce a hard cut at 23:59:59.
+        
+        // For now, let's allow it to be written as is. 
+        // The key is that we are NOT fetching/updating tomorrow's videos here.
+        
+        updates.push({
+            id: prog.id,
+            start_time: currentStart.toISOString(),
+            end_time: newEndTime.toISOString()
+        });
+
+        // Advance anchor
+        currentStart = newEndTime;
+    }
+
+    console.log(`[API] Reordering ${updates.length} programs starting from ${updates[0].start_time}`);
+
+    // Sequential update to ensure safety, or parallel if confident.
+    // Parallel is faster.
+    await Promise.all(updates.map(update => 
+        supabase
+            .from('programs')
+            .update({ 
+                start_time: update.start_time, 
+                end_time: update.end_time 
+            })
+            .eq('id', update.id)
+    ));
+};
+
+export const getCurrentProgram = async (channelId: string) => {
+    const now = new Date();
+    const nowISO = now.toISOString();
+
+    // 1. Get Current Program
     const { data: currentData, error: currentError } = await supabase
         .from('programs')
         .select('*')
         .eq('channel_id', channelId)
-        .lte('start_time', now)
-        .gte('end_time', now)
+        .lte('start_time', nowISO)
+        .gt('end_time', nowISO)
+        .limit(1)
         .single();
-    
-    if (currentError && currentError.code !== 'PGRST116') { // Ignore no rows found
+
+    if (currentError && currentError.code !== 'PGRST116') {
         console.error('Error fetching current program:', currentError);
     }
 
     let current = null;
     let offset = 0;
+    let next = null;
 
     if (currentData) {
         current = mapProgram(currentData);
+        // Calculate offset in seconds
         const startTime = new Date(currentData.start_time).getTime();
-        const nowTime = new Date().getTime();
-        offset = Math.floor((nowTime - startTime) / 1000);
-    }
+        offset = Math.max(0, (now.getTime() - startTime) / 1000);
 
-    // Get next program
-    let next = null;
-    if (current) {
-        const { data: nextData } = await supabase
+        // 2. Get Next Program
+        const { data: nextData, error: nextError } = await supabase
             .from('programs')
             .select('*')
             .eq('channel_id', channelId)
-            .gt('start_time', now)
+            .gte('start_time', currentData.end_time) // Start after current ends
             .order('start_time', { ascending: true })
             .limit(1)
             .single();
-        
+
+        if (nextData) {
+            next = mapProgram(nextData);
+        }
+    } else {
+        // No current program? Maybe check if there is a FUTURE program coming up soon?
+        const { data: nextData, error: nextError } = await supabase
+            .from('programs')
+            .select('*')
+            .eq('channel_id', channelId)
+            .gt('start_time', nowISO)
+            .order('start_time', { ascending: true })
+            .limit(1)
+            .single();
+            
         if (nextData) {
             next = mapProgram(nextData);
         }
@@ -248,3 +339,5 @@ export const getCurrentProgram = async (channelId: string): Promise<{ current: P
 
     return { current, next, offset };
 };
+
+

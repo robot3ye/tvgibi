@@ -41,6 +41,8 @@ export const fetchVideoDetails = async (url: string): Promise<YouTubeVideoDetail
   }
 
   const apiKey = process.env.NEXT_PUBLIC_YOUTUBE_API_KEY;
+  console.log('Using API Key (first 5 chars):', apiKey ? apiKey.substring(0, 5) + '...' : 'MISSING');
+  
   if (!apiKey) {
       console.error('YouTube API Key is missing');
       return null;
@@ -52,7 +54,8 @@ export const fetchVideoDetails = async (url: string): Promise<YouTubeVideoDetail
     );
 
     if (!response.ok) {
-      console.error('YouTube API Error:', response.statusText);
+      const errorData = await response.json();
+      console.error('YouTube API Error Details:', errorData);
       return null;
     }
 

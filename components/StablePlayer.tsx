@@ -13,12 +13,15 @@ const StablePlayer: React.FC<StablePlayerProps> = ({ url, initialStart }) => {
 
   if (!videoId) return null;
 
+  // Ensure initialStart is an integer to avoid YouTube player errors
+  const startSeconds = Math.floor(initialStart);
+
   return (
     <div className="absolute inset-0 w-full h-full bg-black overflow-hidden pointer-events-none">
       <iframe
         width="100%"
         height="100%"
-        src={`https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&controls=0&start=${initialStart}&rel=0&modestbranding=1&playsinline=1&iv_load_policy=3&fs=0&disablekb=1`}
+        src={`https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&controls=0&start=${startSeconds}&rel=0&modestbranding=1&playsinline=1&iv_load_policy=3&fs=0&disablekb=1`}
         title="YouTube video player"
         frameBorder="0"
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
