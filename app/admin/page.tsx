@@ -4,17 +4,17 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
     getChannels, addProgram, getProgramsForChannel, 
     deleteProgram, deletePrograms, updateProgram, reorderPrograms 
-} from '../../../lib/api';
-import { fetchVideoDetails, YouTubeVideoDetails } from '../../../lib/youtube';
-import { Channel, Program } from '../../../data/mockData';
+} from '../../lib/api';
+import { fetchVideoDetails, YouTubeVideoDetails } from '../../lib/youtube';
+import { Channel, Program } from '../../data/mockData';
 import { Check, X } from 'lucide-react';
 
-import AdminHeader from '../../../components/admin-v2/AdminHeader';
-import DayStats from '../../../components/admin-v2/DayStats';
-import VideoInputSection from '../../../components/admin-v2/VideoInputSection';
-import ProgramList from '../../../components/admin-v2/ProgramList';
-import FooterNav from '../../../components/admin-v2/FooterNav';
-import EditModal from '../../../components/admin-v2/EditModal';
+import AdminHeader from '../../components/admin-v2/AdminHeader';
+import DayStats from '../../components/admin-v2/DayStats';
+import VideoInputSection from '../../components/admin-v2/VideoInputSection';
+import ProgramList from '../../components/admin-v2/ProgramList';
+import FooterNav from '../../components/admin-v2/FooterNav';
+import EditModal from '../../components/admin-v2/EditModal';
 
 export default function AdminV2Page() {
     // --- State ---
@@ -416,7 +416,7 @@ export default function AdminV2Page() {
                     onDelete={handleDeleteProgram}
                     onEdit={setEditingProgram}
                     selectedIds={selectedProgramIds}
-                    onToggleSelect={(id) => setSelectedProgramIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])}
+            onToggleSelect={(id) => setSelectedProgramIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])}
                     onBulkDelete={handleBulkDelete}
                     onRefresh={() => loadChannelPrograms(selectedChannelId)}
                     liveProgramId={currentLiveProgram?.id}
