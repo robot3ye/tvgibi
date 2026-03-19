@@ -3,13 +3,36 @@ import { supabase } from './supabase';
 import { Channel, Program } from '../data/mockData';
 
 // Map DB Channel to Frontend Channel
-const mapChannel = (dbChannel: any): Channel => ({
-  id: dbChannel.id,
-  name: dbChannel.name,
-  slug: dbChannel.id, // Using ID as slug since we set 'music-box' as ID
-  logo: dbChannel.logo || dbChannel.name.substring(0, 2).toUpperCase(),
-  color: dbChannel.color || '#000000',
-});
+const mapChannel = (dbChannel: any): Channel => {
+  try {
+      return {
+          id: dbChannel.id,
+          name: dbChannel.name || 'Bilinmeyen Kanal',
+          slug: dbChannel.id, // Using ID as slug since we set 'music-box' as ID
+          logo: dbChannel.logo_corner || dbChannel.logo || (dbChannel.name ? dbChannel.name.substring(0, 2).toUpperCase() : 'TV'), 
+          color: dbChannel.color_primary || dbChannel.color || '#000000',
+          logo_corner: dbChannel.logo_corner,
+          logo_main: dbChannel.logo_main,
+          color_primary: dbChannel.color_primary,
+          color_secondary: dbChannel.color_secondary,
+          motto: dbChannel.motto,
+          age_range: dbChannel.age_range,
+          editors: dbChannel.editors || [],
+          is_online: dbChannel.is_online ?? true,
+          sort_order: dbChannel.sort_order || 0,
+      };
+  } catch (err) {
+      console.error('Error mapping channel:', dbChannel, err);
+      // Return a safe fallback so the whole app doesn't crash
+      return {
+          id: dbChannel?.id || 'error-id',
+          name: 'Hatalı Kanal',
+          slug: 'error-slug',
+          logo: 'ERR',
+          color: '#ff0000'
+      };
+  }
+};
 
 // Map DB Program to Frontend Program
 const mapProgram = (dbProgram: any): Program => {
@@ -47,14 +70,115 @@ const mapProgram = (dbProgram: any): Program => {
 export const getChannels = async (): Promise<Channel[]> => {
   const { data, error } = await supabase
     .from('channels')
-    .select('*');
+    .select('*')
+    .order('sort_order', { ascending: true }) // Sort by the new sort_order column
+    .order('name', { ascending: true }); // Fallback to name
   
   if (error) {
-    console.error('Error fetching channels:', error);
+    console.error('Error fetching channels:', error.message, error.details, error.hint);
     return [];
   }
 
+  if (!data) return [];
+
   return data.map(mapChannel);
+};
+
+export const updateChannel = async (channelId: string, updates: any) => {
+    const { data, error } = await supabase
+        .from('channels')
+        .update(updates)
+        .eq('id', channelId)
+        .select()
+        .single();
+        
+    if (error) {
+        console.error('Error updating channel:', error);
+        throw error;
+    }
+    return mapChannel(data);
+};
+
+export const updateChannelsOrder = async (channelIds: string[]) => {
+    const updates = channelIds.map((id, index) => ({
+        id,
+        sort_order: index + 1
+    }));
+    
+    // We have to update one by one or use an RPC. For simplicity and small lists, Promise.all is fine.
+    await Promise.all(updates.map(update => 
+        supabase
+            .from('channels')
+            .update({ sort_order: update.sort_order })
+            .eq('id', update.id)
+    ));
+};
+
+export const addChannel = async (channelData: any) => {
+    // Generate slug from name if not provided
+    if (!channelData.slug) {
+        channelData.slug = channelData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+    }
+    
+    // Ensure we also save to legacy fields for safety, though mapped properly
+    const dbPayload = {
+        id: channelData.slug, // Use slug as ID to match existing logic
+        name: channelData.name,
+        logo: channelData.logo_corner, // Fallback
+        color: channelData.color_primary, // Fallback
+        logo_corner: channelData.logo_corner,
+        logo_main: channelData.logo_main,
+        color_primary: channelData.color_primary,
+        color_secondary: channelData.color_secondary,
+        motto: channelData.motto,
+        age_range: channelData.age_range,
+        editors: channelData.editors || [],
+    };
+
+    const { data, error } = await supabase
+        .from('channels')
+        .insert([dbPayload])
+        .select()
+        .single();
+    
+    if (error) {
+        console.error('Error adding channel:', error);
+        throw error;
+    }
+    
+    return mapChannel(data);
+};
+
+export const uploadChannelLogo = async (file: File, path: string) => {
+    const { data, error } = await supabase.storage
+        .from('channel-logos')
+        .upload(path, file, {
+            cacheControl: '3600',
+            upsert: true
+        });
+
+    if (error) {
+        console.error('Error uploading logo:', error);
+        throw error;
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+        .from('channel-logos')
+        .getPublicUrl(path);
+        
+    return publicUrl;
+};
+
+export const deleteChannel = async (channelId: string) => {
+    const { error } = await supabase
+        .from('channels')
+        .delete()
+        .eq('id', channelId);
+    
+    if (error) {
+        console.error('Error deleting channel:', error);
+        throw error;
+    }
 };
 
 export const getProgramsForDate = async (date: string): Promise<Program[]> => {

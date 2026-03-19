@@ -1,0 +1,9 @@
+-- Update channels table with new fields
+ALTER TABLE public.channels 
+ADD COLUMN IF NOT EXISTS logo_corner TEXT,
+ADD COLUMN IF NOT EXISTS logo_main TEXT,
+ADD COLUMN IF NOT EXISTS color_primary TEXT DEFAULT '#00FF00',
+ADD COLUMN IF NOT EXISTS color_secondary TEXT DEFAULT '#FF6600',
+ADD COLUMN IF NOT EXISTS motto TEXT,
+ADD COLUMN IF NOT EXISTS age_range TEXT,
+ADD COLUMN IF NOT EXISTS editors TEXT[] DEFAULT '{}';

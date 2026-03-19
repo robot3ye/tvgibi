@@ -5,8 +5,17 @@ export interface Channel {
   id: string;
   name: string;
   slug: string;
-  logo: string;
-  color: string;
+  logo: string; // Will keep for backwards compatibility, but we use logo_corner and logo_main now
+  color: string; // Same here
+  logo_corner?: string;
+  logo_main?: string;
+  color_primary?: string;
+  color_secondary?: string;
+  motto?: string;
+  age_range?: string;
+  editors?: string[];
+  is_online?: boolean;
+  sort_order?: number;
 }
 
 export interface Program {
