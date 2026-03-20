@@ -31,6 +31,7 @@ export interface Program {
   category?: 'movie' | 'news' | 'sports' | 'kids' | 'documentary' | 'entertainment';
   videoId: string; // YouTube Video ID
   duration: number; // Duration in seconds
+  creator?: string; // YouTube Channel/Creator Name
 }
 
 export interface HeroContent {

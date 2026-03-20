@@ -64,6 +64,7 @@ const mapProgram = (dbProgram: any): Program => {
         category: 'entertainment', // Default or add to DB
         videoId: dbProgram.video_id,
         duration: dbProgram.duration,
+        creator: dbProgram.creator, // Add creator mapping
     };
 };
 
