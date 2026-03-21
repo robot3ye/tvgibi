@@ -62,8 +62,9 @@ export default function ChannelsAdminPage() {
                 await deleteChannel(channelId); // Needs to be implemented in api.ts
                 setChannels(prev => prev.filter(c => c.id !== channelId));
                 setToast({ message: 'Kanal silindi.', type: 'success' });
-            } catch (error) {
-                setToast({ message: 'Silme işlemi başarısız.', type: 'error' });
+            } catch (error: any) {
+                console.error('Silme hatası:', error);
+                setToast({ message: `Silme işlemi başarısız: ${error.message || 'Bilinmeyen hata'}`, type: 'error' });
             }
         }
     };

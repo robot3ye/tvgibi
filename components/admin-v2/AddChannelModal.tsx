@@ -97,7 +97,7 @@ export default function AddChannelModal({ isOpen, onClose, onSuccess, initialDat
                 finalLogoMain = await uploadChannelLogo(logoMainFile, path);
             }
 
-            const payload = {
+            const payload: any = {
                 name,
                 logo_corner: finalLogoCorner || name.substring(0, 2).toUpperCase(),
                 logo_main: finalLogoMain,
@@ -107,6 +107,11 @@ export default function AddChannelModal({ isOpen, onClose, onSuccess, initialDat
                 age_range: ageRange,
                 editors
             };
+
+            if (!initialData) {
+                // Sadece yeni kanal eklerken ID (slug) oluştur. Güncellerken ID'ye dokunma.
+                payload.id = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+            }
 
             if (initialData) {
                 await updateChannel(initialData.id, payload);

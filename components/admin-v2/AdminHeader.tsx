@@ -6,9 +6,10 @@ interface AdminHeaderProps {
     selectedDate: string;
     onDateSelect: (date: string) => void;
     onMenuClick: () => void;
+    selectedChannelName?: string;
 }
 
-export default function AdminHeader({ dateTabs, selectedDate, onDateSelect, onMenuClick }: AdminHeaderProps) {
+export default function AdminHeader({ dateTabs, selectedDate, onDateSelect, onMenuClick, selectedChannelName }: AdminHeaderProps) {
     return (
         <header className="bg-[#00FF00] p-2 flex items-center justify-between border-b-4 border-black">
             <div className="flex space-x-2 overflow-x-auto no-scrollbar">
@@ -31,7 +32,7 @@ export default function AdminHeader({ dateTabs, selectedDate, onDateSelect, onMe
             
             <div className="flex items-center space-x-4 pl-4">
                 <h1 className="font-mono font-black text-2xl tracking-tighter text-black hidden md:block">
-                    MusicBox
+                    {selectedChannelName || 'Yayın Akışı'}
                 </h1>
                 <button 
                     onClick={onMenuClick}

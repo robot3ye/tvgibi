@@ -15,15 +15,21 @@ import VideoInputSection from '../../../components/admin-v2/VideoInputSection';
 import ProgramList from '../../../components/admin-v2/ProgramList';
 import FooterNav from '../../../components/admin-v2/FooterNav';
 import EditModal from '../../../components/admin-v2/EditModal';
-import AddChannelModal from '../../../components/admin-v2/AddChannelModal';
+import ChannelListModal from '../../../components/admin-v2/ChannelListModal';
+import BulkAddModal from '../../../components/admin-v2/BulkAddModal';
+import VideoDetailsModal from '../../../components/admin-v2/VideoDetailsModal';
 
-export default function AdminV2Page() {
+import { useSearchParams } from 'next/navigation';
+import { Suspense } from 'react';
+
+function AdminScheduleContent() {
     // --- State ---
     const [channels, setChannels] = useState<Channel[]>([]);
-    // If there's a channel ID in the URL, use it
-    const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-    const initialChannelId = searchParams?.get('channel') || '';
-    const [selectedChannelId, setSelectedChannelId] = useState<string>(initialChannelId);
+    
+    const searchParams = useSearchParams();
+    const urlChannelId = searchParams.get('channel') || '';
+    
+    const [selectedChannelId, setSelectedChannelId] = useState<string>('');
     const [channelPrograms, setChannelPrograms] = useState<Program[]>([]);
     const [selectedDate, setSelectedDate] = useState<string>('');
     
@@ -32,6 +38,7 @@ export default function AdminV2Page() {
     const [loading, setLoading] = useState(false);
     const [video, setVideo] = useState<YouTubeVideoDetails | null>(null);
     const [adding, setAdding] = useState(false);
+    const [isVideoDetailsModalOpen, setIsVideoDetailsModalOpen] = useState(false);
     
     // Selection & Editing
     const [selectedProgramIds, setSelectedProgramIds] = useState<string[]>([]);
@@ -39,7 +46,8 @@ export default function AdminV2Page() {
     const [saving, setSaving] = useState(false);
     
     // Channel Management
-    const [isAddChannelModalOpen, setIsAddChannelModalOpen] = useState(false);
+    const [isChannelListModalOpen, setIsChannelListModalOpen] = useState(false);
+    const [isBulkAddModalOpen, setIsBulkAddModalOpen] = useState(false);
 
     // Toast
     const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
@@ -50,7 +58,7 @@ export default function AdminV2Page() {
     const loadChannels = async () => {
         const data = await getChannels();
         setChannels(data);
-        if (data.length > 0 && !selectedChannelId) {
+        if (data.length > 0 && !urlChannelId && !selectedChannelId) {
             setSelectedChannelId(data[0].id);
         }
     };
@@ -60,6 +68,13 @@ export default function AdminV2Page() {
         // Initialize with local date string instead of UTC
         setSelectedDate(getLocalDateString()); 
     }, []);
+
+    // Sync state with URL parameter changes
+    useEffect(() => {
+        if (urlChannelId) {
+            setSelectedChannelId(urlChannelId);
+        }
+    }, [urlChannelId]);
 
     // 2. Load Programs
     useEffect(() => {
@@ -151,8 +166,12 @@ export default function AdminV2Page() {
         setVideo(null);
         try {
             const details = await fetchVideoDetails(url);
-            if (details) setVideo(details);
-            else setToast({ message: 'Video bulunamadı.', type: 'error' });
+            if (details) {
+                setVideo(details);
+                setIsVideoDetailsModalOpen(true);
+            } else {
+                setToast({ message: 'Video bulunamadı.', type: 'error' });
+            }
         } catch (err) {
             console.error(err);
             setToast({ message: 'Hata oluştu.', type: 'error' });
@@ -161,8 +180,11 @@ export default function AdminV2Page() {
         }
     };
 
-    const handleAddProgram = async () => {
-        if (!video || !selectedChannelId) return;
+    const handleAddProgram = async (editedVideoDetails?: any) => {
+        // Use editedVideoDetails if provided (from modal), otherwise fallback to state video
+        const videoToAdd = editedVideoDetails || video;
+        
+        if (!videoToAdd || !selectedChannelId) return;
         setAdding(true);
         
         try {
@@ -188,7 +210,7 @@ export default function AdminV2Page() {
                 return;
             }
 
-            const durationMs = video.duration * 1000;
+            const durationMs = videoToAdd.duration * 1000;
             const endTime = new Date(startTime.getTime() + durationMs);
 
             if (endTime > endOfDay) {
@@ -200,23 +222,73 @@ export default function AdminV2Page() {
 
             await addProgram({
                 channel_id: selectedChannelId,
-                title: video.title,
-                description: video.description,
-                video_id: video.videoId,
-                duration: video.duration,
+                title: videoToAdd.title,
+                description: videoToAdd.description,
+                video_id: videoToAdd.videoId,
+                duration: videoToAdd.duration,
+                creator: videoToAdd.creator,
                 start_time: startTime.toISOString(),
                 end_time: endTime.toISOString(),
-                thumbnail: video.thumbnail
+                thumbnail: videoToAdd.thumbnail
             });
 
             setUrl('');
             setVideo(null);
             await loadChannelPrograms(selectedChannelId);
             setToast({ message: 'Video eklendi!', type: 'success' });
+            setIsVideoDetailsModalOpen(false);
 
         } catch (err) {
             console.error(err);
             setToast({ message: 'Ekleme hatası.', type: 'error' });
+        } finally {
+            setAdding(false);
+        }
+    };
+
+    const handleAddBulk = async (videos: any[]) => {
+        if (!selectedChannelId || videos.length === 0) return;
+        setAdding(true);
+
+        try {
+            const startOfDay = new Date(selectedDate);
+            startOfDay.setHours(0, 0, 0, 0);
+            
+            const dayPrograms = channelPrograms.filter(p => p.date === selectedDate);
+            dayPrograms.sort((a, b) => a.startTime.localeCompare(b.startTime));
+            const lastProg = dayPrograms[dayPrograms.length - 1];
+
+            let currentStartTime = new Date(startOfDay);
+            if (lastProg) {
+                const [h, m] = lastProg.endTime.split(':').map(Number);
+                currentStartTime.setHours(h, m, 0, 0);
+            }
+
+            for (const v of videos) {
+                const durationMs = v.duration * 1000;
+                const endTime = new Date(currentStartTime.getTime() + durationMs);
+
+                await addProgram({
+                    channel_id: selectedChannelId,
+                    title: v.title,
+                    description: v.description,
+                    video_id: v.videoId,
+                    duration: v.duration,
+                    creator: v.creator,
+                    start_time: currentStartTime.toISOString(),
+                    end_time: endTime.toISOString(),
+                    thumbnail: v.thumbnail
+                });
+
+                currentStartTime = endTime;
+            }
+
+            await loadChannelPrograms(selectedChannelId);
+            setToast({ message: `${videos.length} video toplu olarak eklendi!`, type: 'success' });
+            setIsBulkAddModalOpen(false);
+        } catch (err) {
+            console.error(err);
+            setToast({ message: 'Toplu ekleme hatası.', type: 'error' });
         } finally {
             setAdding(false);
         }
@@ -398,32 +470,36 @@ export default function AdminV2Page() {
 
     return (
         <div className="min-h-screen bg-[#111] font-mono pb-20">
-            {/* Header */}
-            <AdminHeader 
-                dateTabs={dateTabs} 
-                selectedDate={selectedDate} 
-                onDateSelect={setSelectedDate} 
-                onMenuClick={() => setIsAddChannelModalOpen(true)}
-            />
+            <div className="sticky top-0 z-40 bg-[#111]">
+                {/* Header */}
+                <AdminHeader 
+                    dateTabs={dateTabs} 
+                    selectedDate={selectedDate} 
+                    onDateSelect={setSelectedDate} 
+                    onMenuClick={() => setIsChannelListModalOpen(true)}
+                    selectedChannelName={channels.find(c => c.id === selectedChannelId)?.name}
+                />
+
+                {/* Video Input */}
+                <VideoInputSection 
+                    url={url}
+                    setUrl={setUrl}
+                    onFetch={handleFetch}
+                    videoDetails={video}
+                    onAdd={handleAddProgram}
+                    onCancel={() => { setVideo(null); setUrl(''); setIsVideoDetailsModalOpen(false); }}
+                    onAddFiller={handleAddFiller}
+                    onBulkAddClick={() => setIsBulkAddModalOpen(true)}
+                    loading={loading}
+                    adding={adding}
+                />
+            </div>
 
             {/* Day Stats (Hero) */}
             <DayStats 
                 selectedDate={selectedDate} 
                 totalDurationSeconds={totalDurationSeconds}
                 currentProgram={currentLiveProgram}
-            />
-
-            {/* Video Input */}
-            <VideoInputSection 
-                url={url}
-                setUrl={setUrl}
-                onFetch={handleFetch}
-                videoDetails={video}
-                onAdd={handleAddProgram}
-                onCancel={() => { setVideo(null); setUrl(''); }}
-                onAddFiller={handleAddFiller}
-                loading={loading}
-                adding={adding}
             />
 
             {/* Main Content Area */}
@@ -453,13 +529,30 @@ export default function AdminV2Page() {
                 saving={saving} 
             />
             
-            <AddChannelModal 
-                isOpen={isAddChannelModalOpen}
-                onClose={() => setIsAddChannelModalOpen(false)}
-                onSuccess={() => {
-                    loadChannels();
-                    setToast({ message: 'Kanal başarıyla eklendi!', type: 'success' });
+            <ChannelListModal 
+                isOpen={isChannelListModalOpen}
+                onClose={() => setIsChannelListModalOpen(false)}
+                channels={channels}
+                currentChannelId={selectedChannelId}
+            />
+
+            <BulkAddModal 
+                isOpen={isBulkAddModalOpen}
+                onClose={() => setIsBulkAddModalOpen(false)}
+                onAddBulk={handleAddBulk}
+                adding={adding}
+            />
+
+            <VideoDetailsModal 
+                isOpen={isVideoDetailsModalOpen}
+                onClose={() => {
+                    setIsVideoDetailsModalOpen(false);
+                    setVideo(null);
+                    setUrl('');
                 }}
+                video={video}
+                onAdd={handleAddProgram}
+                adding={adding}
             />
 
             {/* Toast */}
@@ -474,5 +567,13 @@ export default function AdminV2Page() {
                 </div>
             )}
         </div>
+    );
+}
+
+export default function AdminV2Page() {
+    return (
+        <Suspense fallback={<div className="min-h-screen bg-[#111] text-[#00FF00] font-mono flex items-center justify-center text-2xl font-bold">YÜKLENİYOR...</div>}>
+            <AdminScheduleContent />
+        </Suspense>
     );
 }

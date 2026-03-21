@@ -19,7 +19,7 @@ import {
     useSortable 
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Trash2, Edit2, RefreshCw, CheckSquare, Square } from 'lucide-react';
+import { GripVertical, Trash2, Edit2, RefreshCw, CheckSquare, Square, Youtube } from 'lucide-react';
 import { Program } from '../../data/mockData';
 
 // --- Sortable Row Component ---
@@ -139,6 +139,15 @@ function ProgramRow({ program, index, isOverlay, onDelete, onEdit, onToggleSelec
 
             {/* Actions */}
             <div className="flex items-center gap-2 pr-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <a 
+                    href={`https://www.youtube.com/watch?v=${program.videoId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`p-1 hover:bg-[#ff0000] hover:text-white transition-colors rounded ${textClass}`}
+                    title="Youtube'da Aç"
+                >
+                    <Youtube size={18} />
+                </a>
                  <button onClick={() => onEdit(program)} className={`p-1 hover:bg-white/20 rounded ${textClass}`}>
                     <Edit2 size={18} />
                 </button>

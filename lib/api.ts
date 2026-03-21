@@ -86,9 +86,19 @@ export const getChannels = async (): Promise<Channel[]> => {
 };
 
 export const updateChannel = async (channelId: string, updates: any) => {
+    // We only update the 'id' (which acts as our slug) in the database
+    // The DB does not have a 'slug' column, we use 'id' for the URL slug.
+    if (updates.name && !updates.id) {
+        updates.id = updates.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+    }
+    
+    // Ensure we don't accidentally send a 'slug' field to the database
+    const dbUpdates = { ...updates };
+    delete dbUpdates.slug;
+
     const { data, error } = await supabase
         .from('channels')
-        .update(updates)
+        .update(dbUpdates)
         .eq('id', channelId)
         .select()
         .single();
@@ -171,6 +181,18 @@ export const uploadChannelLogo = async (file: File, path: string) => {
 };
 
 export const deleteChannel = async (channelId: string) => {
+    // 1. Önce bu kanala ait olan tüm programları sil (Foreign key constraint hatasını önlemek için)
+    const { error: programsError } = await supabase
+        .from('programs')
+        .delete()
+        .eq('channel_id', channelId);
+        
+    if (programsError) {
+        console.error('Error deleting channel programs:', programsError);
+        throw programsError;
+    }
+
+    // 2. Sonra kanalı sil
     const { error } = await supabase
         .from('channels')
         .delete()

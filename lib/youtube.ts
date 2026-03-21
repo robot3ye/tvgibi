@@ -5,6 +5,7 @@ export interface YouTubeVideoDetails {
   duration: number; // in seconds
   videoId: string;
   thumbnail: string;
+  creator?: string;
 }
 
 // Helper to parse ISO 8601 duration (PT1H2M10S) to seconds
@@ -75,7 +76,8 @@ export const fetchVideoDetails = async (url: string): Promise<YouTubeVideoDetail
       title: snippet.title,
       description: snippet.description,
       thumbnail: snippet.thumbnails.maxres?.url || snippet.thumbnails.high?.url || snippet.thumbnails.default?.url,
-      duration: parseDuration(contentDetails.duration)
+      duration: parseDuration(contentDetails.duration),
+      creator: snippet.channelTitle
     };
 
   } catch (error) {
