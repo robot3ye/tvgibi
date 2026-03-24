@@ -118,32 +118,34 @@ export default function HomeClient() {
                     <div className="w-full max-w-6xl mx-auto flex flex-col h-full">
                         
                         {/* Header Block */}
-                        <div className="flex items-stretch justify-between mt-8">
+                        <div className="flex items-stretch justify-between mt-8 bg-black border-4 border-black p-8 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
                             <div className="flex-1 mr-8">
-                                <div className="bg-black text-white p-8 rounded-2xl border-4 border-black inline-block mb-6">
-                                    <h1 className="text-4xl font-bold tracking-tighter mb-4 flex items-center">
+                                <div className="text-white inline-flex items-center mb-6">
+                                    <h1 className="text-4xl md:text-5xl font-bold tracking-tighter lowercase">
                                         tvgibi.tv
-                                        <div className="flex space-x-1 ml-4">
-                                            <div className="w-2 h-2 rounded-full bg-red-500"></div>
-                                            <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                                            <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                                        </div>
                                     </h1>
+                                    <div className="flex space-x-1 ml-3">
+                                        <div className="w-2 h-2 rounded-full bg-[#00FFFF]"></div>
+                                        <div className="w-2 h-2 rounded-full bg-[#FF00FF]"></div>
+                                        <div className="w-2 h-2 rounded-full bg-[#00FF00]"></div>
+                                    </div>
                                 </div>
                                 <p className="text-white text-lg font-bold leading-relaxed mb-6">
-                                    Herkesin <span className="text-[#00FF00]">aynı anda</span> izleyebildiği,<br />
-                                    <span className="text-red-500">youtube</span>'dan beslenen kanalları,<br />
-                                    <span className="text-[#00FF00]">insan seçkisi</span> yayın akışıyla,<br />
+                                    Herkesin <span className="text-[#00FFFF]">aynı anda</span> izleyebildiği,<br />
+                                    <span className="text-[#FF0000]">youtube</span>'dan beslenen kanalları,<br />
+                                    <span className="text-[#00FFFF]">insan seçkisi</span> yayın akışıyla,<br />
                                     <span className="text-[#00FF00]">7/24</span> yayında.. Tamamen bedava!
                                 </p>
                                 <p className="text-white text-lg font-bold">
-                                    Bir TeleVizyon <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-yellow-500 to-green-500">simülasyonu..</span>
+                                    Bir TeleVizyon <span className="text-gray-400 opacity-50">simülasyonu..</span>
                                 </p>
                             </div>
                             
                             {/* Test Screen Image */}
                             <div className="hidden md:block w-72 h-auto flex-shrink-0">
-                                <img src="/test-screen.png" alt="Test Screen" className="w-full h-full object-cover border-4 border-black" />
+                                <div className="w-full h-full bg-black">
+                                    <img src="/test-screen.png" alt="Test Screen" className="w-full h-full object-cover" />
+                                </div>
                             </div>
                         </div>
 
@@ -155,7 +157,7 @@ export default function HomeClient() {
                                     <button 
                                         onClick={() => setTimeMode('NOW')}
                                         className={`px-8 py-2 font-bold uppercase border-4 border-black transition-colors ${
-                                            timeMode === 'NOW' ? 'bg-[#00FF00] text-black' : 'bg-[#00FF00]/40 text-black hover:bg-[#00FF00]/80'
+                                            timeMode === 'NOW' ? 'bg-[#00FF00] text-black' : 'bg-[#00FF00] text-black hover:bg-white'
                                         }`}
                                     >
                                         ŞU_AN
@@ -163,13 +165,13 @@ export default function HomeClient() {
                                     <button 
                                         onClick={() => setTimeMode('NEXT')}
                                         className={`px-8 py-2 font-bold uppercase border-4 border-black transition-colors ${
-                                            timeMode === 'NEXT' ? 'bg-[#FF00FF] text-black' : 'bg-[#FF00FF]/40 text-black hover:bg-[#FF00FF]/80'
+                                            timeMode === 'NEXT' ? 'bg-[#FF00FF] text-black' : 'bg-[#FF00FF] text-black hover:bg-white'
                                         }`}
                                     >
                                         AZ_SONRA
                                     </button>
                                 </div>
-                                <div className="bg-blue-600 text-white border-4 border-black px-4 py-1 font-bold uppercase text-center">
+                                <div className="bg-[#0066FF] text-white border-4 border-black px-4 py-1 font-bold uppercase text-center">
                                     {timeMode === 'NOW' ? 'ŞU_AN BUNLAR YAYINDA:' : 'AZ_SONRA BUNLAR YAYINDA:'}
                                 </div>
                             </div>

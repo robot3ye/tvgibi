@@ -16,7 +16,9 @@
     "next": "16.1.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "react-player": "^3.4.0"
+    "react-draggable": "^4.5.0",
+    "react-player": "^3.4.0",
+    "screenfull": "^6.0.2"
   },
   "devDependencies": {
     "@supabase/supabase-js": "^2.90.1",
