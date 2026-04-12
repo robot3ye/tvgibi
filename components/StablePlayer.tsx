@@ -41,7 +41,7 @@ const StablePlayer: React.FC<StablePlayerProps> = ({ url, initialStart, volume }
                 ref={iframeRef}
         width="100%"
         height="100%"
-        src={`https://www.youtube.com/embed/${videoId}?enablejsapi=1&autoplay=1&mute=0&controls=0&start=${startSeconds}&rel=0&modestbranding=1&playsinline=1&iv_load_policy=3&fs=0&disablekb=1`}
+        src={`https://www.youtube-nocookie.com/embed/${videoId}?enablejsapi=1&autoplay=1&mute=0&controls=0&start=${startSeconds}&rel=0&modestbranding=1&playsinline=1&iv_load_policy=3&fs=0&disablekb=1`}
         title="YouTube video player"
         frameBorder="0"
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"

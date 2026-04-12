@@ -21,6 +21,9 @@ export default function ChannelPage({ params }: PageProps) {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   
+  // Track active slug in state to allow silent URL changes without unmounting
+  const [activeSlug, setActiveSlug] = useState(slug);
+  
   const [channel, setChannel] = useState<Channel | null>(null);
   const [currentProgram, setCurrentProgram] = useState<Program | null>(null);
   const [nextProgram, setNextProgram] = useState<Program | null>(null);
@@ -29,6 +32,10 @@ export default function ChannelPage({ params }: PageProps) {
   const [allChannels, setAllChannels] = useState<Channel[]>([]);
   const [volume, setVolume] = useState(100);
   const [showControls, setShowControls] = useState(true);
+  const [showUI, setShowUI] = useState(true); // Control border, logo, channel num
+  const [hasInteracted, setHasInteracted] = useState(true); // Default true, checked in effect
+  const [isZapping, setIsZapping] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   
   // Track remote control position across channel changes
   // Provide a default fallback position for SSR / initial render
@@ -38,9 +45,35 @@ export default function ChannelPage({ params }: PageProps) {
   const draggableNodeRef = useRef<HTMLDivElement>(null);
   const lastProgramIdRef = useRef<string | null>(null);
 
-  // Initialize position on client side only to avoid hydration mismatch
+  // Initialize position and interaction on client side only to avoid hydration mismatch
   useEffect(() => {
-    // If no position saved in state/storage, start it at bottom-right 
+      // In Next.js App Router, client-side navigation doesn't always trigger standard browser navigation events
+      // the same way a hard reload does. Also document.referrer might not be reliable across local navigations.
+      
+      // Let's use a simpler approach:
+      // If we have 'tv_started' in sessionStorage, it means the user has ALREADY clicked the "TV'Yİ AÇ" button 
+      // or navigated from the home page (we'll set it there too).
+      // However, if they HARD REFRESH on this page, the browser loses the "user gesture" context required for YouTube autoplay.
+      // So we MUST show the modal on a hard refresh, even if 'tv_started' is in sessionStorage.
+      
+      const isReload = (window.performance.navigation && window.performance.navigation.type === 1) ||
+                       (window.performance.getEntriesByType && window.performance.getEntriesByType("navigation").map((nav: any) => nav.type).includes("reload"));
+      
+      // If it's a hard reload, ALWAYS require interaction again.
+      if (isReload) {
+          setHasInteracted(false);
+          sessionStorage.removeItem('tv_started');
+      } else {
+          // If it's NOT a reload, check if we already have permission (from home page or previous click)
+          const hasPermission = sessionStorage.getItem('tv_started');
+          if (hasPermission) {
+              setHasInteracted(true);
+          } else {
+              setHasInteracted(false);
+          }
+      }
+
+      // If no position saved in state/storage, start it at bottom-right 
     // We'll let Draggable use its default bounds first, or we can set a specific starting x/y
     const savedX = localStorage.getItem('remotePosX');
     const savedY = localStorage.getItem('remotePosY');
@@ -62,11 +95,11 @@ export default function ChannelPage({ params }: PageProps) {
     const fetchChannel = async () => {
         const channels = await getChannels();
         setAllChannels(channels);
-        const found = channels.find(c => c.slug === slug);
+        const found = channels.find(c => c.slug === activeSlug);
         setChannel(found || null);
     };
     fetchChannel();
-  }, [slug]);
+  }, [activeSlug]);
 
   // Optimized Schedule Logic
   useEffect(() => {
@@ -144,12 +177,50 @@ export default function ChannelPage({ params }: PageProps) {
   }, [channel, currentProgram]); // Re-run if channel changes or current program updates (to update closure vars)
 
 
+  // Helper for Zapping Effect
+  const triggerZap = (newSlug: string) => {
+      if (newSlug === activeSlug || isZapping) return;
+      
+      setIsZapping(true);
+      
+      // Play audio if available
+      if (audioRef.current) {
+          audioRef.current.currentTime = 0;
+          audioRef.current.volume = 0.5; // Adjust as needed
+          audioRef.current.play().catch(e => console.log("Audio play failed:", e));
+      }
+
+      // Immediately switch the active slug and URL so data starts fetching *behind* the noise
+      setActiveSlug(newSlug);
+      window.history.pushState(null, '', `/channel/${newSlug}`);
+
+      // After 2 seconds, hide the noise
+      setTimeout(() => {
+          setIsZapping(false);
+          
+          // Make sure UI (border, channel num) shows up after zap
+          setShowUI(true);
+          
+          // But keep controls hidden until mouse moves
+          setShowControls(false);
+          
+          // Hide UI again after 3s if no mouse movement
+          setTimeout(() => setShowUI(false), 3000);
+
+          if (audioRef.current) {
+              audioRef.current.pause();
+              audioRef.current.currentTime = 0;
+          }
+      }, 2000);
+  };
+
   // Keyboard Controls
   useEffect(() => {
       const handleKeyDown = (e: KeyboardEvent) => {
-          if (!channel || allChannels.length === 0) return;
+          // If we are currently zapping, ignore new key presses to prevent rapid firing
+          if (!channel || allChannels.length === 0 || isZapping) return;
 
-          const currentIndex = allChannels.findIndex(c => c.id === channel.id);
+          const currentIndex = allChannels.findIndex(c => c.slug === activeSlug);
 
           // Volume controls
           if (e.key === 'ArrowUp') {
@@ -163,49 +234,54 @@ export default function ChannelPage({ params }: PageProps) {
           // Channel Navigation
           else if (e.key === 'ArrowRight') {
               const nextIndex = (currentIndex + 1) % allChannels.length;
-              router.push(`/channel/${allChannels[nextIndex].id}`);
+              triggerZap(allChannels[nextIndex].slug);
           } else if (e.key === 'ArrowLeft') {
               const prevIndex = (currentIndex - 1 + allChannels.length) % allChannels.length;
-              router.push(`/channel/${allChannels[prevIndex].id}`);
+              triggerZap(allChannels[prevIndex].slug);
           }
 
           // Number keys for channel selection
           if (/^[0-9]$/.test(e.key)) {
-              // Convert 1-based input to 0-based index. 0 maps to 10th channel (index 9) like a TV remote, 
-              // or just literal mapping. Let's do simple literal mapping: 1 -> index 0, 2 -> index 1.
               const num = parseInt(e.key);
               let targetIndex = -1;
-              
-              if (num === 0) {
-                  targetIndex = 9; // 0 goes to 10th channel
-              } else {
-                  targetIndex = num - 1;
-              }
+              if (num === 0) targetIndex = 9;
+              else targetIndex = num - 1;
 
               if (targetIndex >= 0 && targetIndex < allChannels.length) {
-                  router.push(`/channel/${allChannels[targetIndex].id}`);
+                  triggerZap(allChannels[targetIndex].slug);
               }
           }
       };
 
       window.addEventListener('keydown', handleKeyDown);
       return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [channel, allChannels, router]);
+  }, [channel, allChannels, activeSlug, isZapping]);
 
   // Mouse idle detection to hide controls
   useEffect(() => {
-      let timeout: NodeJS.Timeout;
+      let controlsTimeout: NodeJS.Timeout;
+      let uiTimeout: NodeJS.Timeout;
       
       const handleMouseMove = () => {
           setShowControls(true);
-          clearTimeout(timeout);
-          timeout = setTimeout(() => setShowControls(false), 3000);
+          setShowUI(true);
+          
+          clearTimeout(controlsTimeout);
+          clearTimeout(uiTimeout);
+          
+          controlsTimeout = setTimeout(() => setShowControls(false), 3000);
+          uiTimeout = setTimeout(() => setShowUI(false), 3000);
       };
 
       window.addEventListener('mousemove', handleMouseMove);
+      
+      // Initial trigger to start timeouts
+      handleMouseMove();
+
       return () => {
           window.removeEventListener('mousemove', handleMouseMove);
-          clearTimeout(timeout);
+          clearTimeout(controlsTimeout);
+          clearTimeout(uiTimeout);
       };
   }, []);
 
@@ -237,16 +313,38 @@ export default function ChannelPage({ params }: PageProps) {
 
   if (!mounted) return <div className="min-h-screen bg-black" />;
 
+  if (!hasInteracted) {
+      return (
+          <div className="fixed inset-0 z-[999] bg-black flex flex-col items-center justify-center text-white">
+              <h1 className="text-4xl md:text-6xl font-bold mb-8 uppercase text-center max-w-lg tracking-tighter" style={{ color: channel?.color_primary || '#00FF4F' }}>
+                  TVGİBİ.TV
+              </h1>
+              <button 
+                  onClick={() => {
+                      setHasInteracted(true);
+                      sessionStorage.setItem('tv_started', '1');
+                  }}
+                  className="px-12 py-6 bg-[#00FF4F] text-black font-bold text-3xl border-4 border-white shadow-[8px_8px_0px_0px_rgba(255,255,255,1)] hover:bg-[#00cc3f] transition-transform active:translate-y-2 active:translate-x-2 active:shadow-none uppercase"
+              >
+                  TV'Yİ AÇ
+              </button>
+          </div>
+      );
+  }
+
   return (
     <div ref={playerContainerRef} className="min-h-screen bg-black text-white flex flex-col font-mono relative overflow-hidden">
+      {/* Audio element for zapping noise */}
+      <audio ref={audioRef} src="/tv-noise-fx.wav" preload="auto" />
+
       {/* 25px Dynamic Border around the whole screen */}
       <div 
-        className={`absolute inset-0 z-50 pointer-events-none transition-opacity duration-500 ${showControls ? 'opacity-100' : 'opacity-0'}`}
+        className={`absolute inset-0 z-50 pointer-events-none transition-opacity duration-500 ${showUI ? 'opacity-100' : 'opacity-0'}`}
         style={{ border: `25px solid ${channel.color_primary || '#00FF4F'}` }}
       ></div>
 
       {/* Top Navigation - Right Corner Badge */}
-      <div className={`absolute top-8 right-8 z-50 transition-opacity duration-500 ${showControls ? 'opacity-100' : 'opacity-0'}`}>
+      <div className={`absolute top-8 right-8 z-50 transition-opacity duration-500 ${showUI ? 'opacity-100' : 'opacity-0'}`}>
         <div className="flex flex-col items-end pointer-events-none mt-[25px] mr-[25px]">
             {/* Channel Number (e.g. [01]) */}
             <div 
@@ -268,7 +366,19 @@ export default function ChannelPage({ params }: PageProps) {
         </div>
       </div>
 
+      {/* Main Player Area */}
       <div className="flex-grow relative bg-black flex items-center justify-center">
+        {/* Zapping Noise Overlay */}
+        {isZapping && (
+            <div className="absolute inset-0 z-[60] bg-black pointer-events-none flex items-center justify-center">
+                <img 
+                    src="/noise.gif" 
+                    alt="TV Noise" 
+                    className="w-full h-full object-cover mix-blend-screen"
+                />
+            </div>
+        )}
+
         {currentProgram ? (
             <StablePlayer 
                 url={`https://www.youtube.com/watch?v=${currentProgram.videoId}`}
@@ -282,7 +392,7 @@ export default function ChannelPage({ params }: PageProps) {
         )}
 
         {/* Floating Program Info Card (Top Left) */}
-        <div className={`absolute top-8 left-8 z-40 max-w-[30%] min-w-[350px] transition-opacity duration-500 mt-[25px] ml-[25px] hover:opacity-100 ${showControls ? 'opacity-50' : 'opacity-0'}`}>
+        <div className={`absolute top-8 left-8 z-40 max-w-[30%] min-w-[350px] transition-opacity duration-500 mt-[25px] ml-[25px] hover:opacity-100 ${showControls ? 'opacity-30' : 'opacity-0'}`}>
             {currentProgram && (
                 <div 
                     className="p-6 text-black border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]"
@@ -363,7 +473,7 @@ export default function ChannelPage({ params }: PageProps) {
                                 onClick={() => {
                                     const currentIndex = allChannels.findIndex(c => c.id === channel.id);
                                     const prevIndex = (currentIndex - 1 + allChannels.length) % allChannels.length;
-                                    router.push(`/channel/${allChannels[prevIndex].id}`);
+                                    triggerZap(allChannels[prevIndex].slug);
                                 }}
                                 className="p-2 hover:bg-white/20 rounded-full transition-colors text-white"
                             >
@@ -374,7 +484,7 @@ export default function ChannelPage({ params }: PageProps) {
                                 onClick={() => {
                                     const currentIndex = allChannels.findIndex(c => c.id === channel.id);
                                     const nextIndex = (currentIndex + 1) % allChannels.length;
-                                    router.push(`/channel/${allChannels[nextIndex].id}`);
+                                    triggerZap(allChannels[nextIndex].slug);
                                 }}
                                 className="p-2 hover:bg-white/20 rounded-full transition-colors text-white"
                             >
