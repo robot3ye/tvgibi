@@ -93,6 +93,11 @@ export default function ChannelPage({ params }: PageProps) {
   // Fetch Channel Details
   useEffect(() => {
     const fetchChannel = async () => {
+        // Clear current program when slug changes so we don't show old video during noise
+        setCurrentProgram(null);
+        setNextProgram(null);
+        lastProgramIdRef.current = null;
+        
         const channels = await getChannels();
         setAllChannels(channels);
         const found = channels.find(c => c.slug === activeSlug);
@@ -183,35 +188,44 @@ export default function ChannelPage({ params }: PageProps) {
       
       setIsZapping(true);
       
+      // Force unmount the old player IMMEDIATELY by clearing states before we pushState
+      setCurrentProgram(null);
+      setNextProgram(null);
+      lastProgramIdRef.current = null;
+      
       // Play audio if available
       if (audioRef.current) {
           audioRef.current.currentTime = 0;
           audioRef.current.volume = 0.5; // Adjust as needed
+          audioRef.current.loop = true; // Loop until zap finishes
           audioRef.current.play().catch(e => console.log("Audio play failed:", e));
       }
 
-      // Immediately switch the active slug and URL so data starts fetching *behind* the noise
-      setActiveSlug(newSlug);
-      window.history.pushState(null, '', `/channel/${newSlug}`);
-
-      // After 2 seconds, hide the noise
+      // We wait just a tiny tick (50ms) to ensure React actually renders the `null` state
+      // (destroying the old iframe) before we switch the active slug and trigger the new data fetch.
       setTimeout(() => {
-          setIsZapping(false);
+          setActiveSlug(newSlug);
+          window.history.pushState(null, '', `/channel/${newSlug}`);
           
-          // Make sure UI (border, channel num) shows up after zap
-          setShowUI(true);
-          
-          // But keep controls hidden until mouse moves
-          setShowControls(false);
-          
-          // Hide UI again after 3s if no mouse movement
-          setTimeout(() => setShowUI(false), 3000);
+          // Fixed timeout for zap noise (2.5s gives enough time for API and YouTube to load behind it)
+          setTimeout(() => {
+              setIsZapping(false);
+              
+              // Show UI (border, channel num) after zap
+              setShowUI(true);
+              
+              // But keep controls hidden until mouse moves
+              setShowControls(false);
+              
+              // Hide UI again after 3s if no mouse movement
+              setTimeout(() => setShowUI(false), 3000);
 
-          if (audioRef.current) {
-              audioRef.current.pause();
-              audioRef.current.currentTime = 0;
-          }
-      }, 2000);
+              if (audioRef.current) {
+                  audioRef.current.pause();
+                  audioRef.current.currentTime = 0;
+              }
+          }, 2500);
+      }, 50); 
   };
 
   // Keyboard Controls

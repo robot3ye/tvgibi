@@ -27,6 +27,22 @@ const StablePlayer: React.FC<StablePlayerProps> = ({ url, initialStart, volume }
       }
   }, [volume]);
 
+  const handleIframeLoad = () => {
+      // YouTube iFrame takes a moment to initialize its internal API after the iframe fires 'load'
+      // We send the volume command periodically for the first few seconds to ensure it catches it.
+      let attempts = 0;
+      const interval = setInterval(() => {
+          if (iframeRef.current && iframeRef.current.contentWindow) {
+              iframeRef.current.contentWindow.postMessage(
+                  JSON.stringify({ event: 'command', func: 'setVolume', args: [volume] }),
+                  '*'
+              );
+          }
+          attempts++;
+          if (attempts > 8) clearInterval(interval); // Try for 4 seconds
+      }, 500);
+  };
+
   if (!videoId) return null;
 
   // Ensure initialStart is an integer to avoid YouTube player errors
@@ -46,6 +62,7 @@ const StablePlayer: React.FC<StablePlayerProps> = ({ url, initialStart, volume }
         frameBorder="0"
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
         allowFullScreen
+        onLoad={handleIframeLoad}
         className="w-full h-full object-contain" // object-contain to fit video without crop
         style={{ pointerEvents: 'none' }}
       />
