@@ -4,10 +4,14 @@ import React, { useEffect, useState, use, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { ArrowLeft, Clock, Volume2, VolumeX, Maximize, Copy, List, ChevronLeft, ChevronRight, GripHorizontal } from 'lucide-react';
-import Draggable from 'react-draggable';
 import screenfull from 'screenfull';
 import { Program, Channel } from '../../../data/mockData';
 import { getChannels, getCurrentProgram } from '../../../lib/api';
+
+import TVOverlay from '../../../components/player/TVOverlay';
+import ProgramInfoCard from '../../../components/player/ProgramInfoCard';
+import RemoteControl from '../../../components/player/RemoteControl';
+import ZappingNoise from '../../../components/player/ZappingNoise';
 
 // Dynamic import with SSR disabled to prevent hydration errors
 const StablePlayer = dynamic(() => import('../../../components/StablePlayer'), { ssr: false });
@@ -31,6 +35,7 @@ export default function ChannelPage({ params }: PageProps) {
   const [initialOffset, setInitialOffset] = useState(0);
   const [allChannels, setAllChannels] = useState<Channel[]>([]);
   const [volume, setVolume] = useState(100);
+  const [subtitleLang, setSubtitleLang] = useState<string | null>(null); // State for subtitles
   const [showControls, setShowControls] = useState(true);
   const [showUI, setShowUI] = useState(true); // Control border, logo, channel num
   const [hasInteracted, setHasInteracted] = useState(true); // Default true, checked in effect
@@ -44,6 +49,7 @@ export default function ChannelPage({ params }: PageProps) {
   const playerContainerRef = useRef<HTMLDivElement>(null);
   const draggableNodeRef = useRef<HTMLDivElement>(null);
   const lastProgramIdRef = useRef<string | null>(null);
+  const currentOffsetRef = useRef<number>(0);
 
   // Initialize position and interaction on client side only to avoid hydration mismatch
   useEffect(() => {
@@ -83,6 +89,15 @@ export default function ChannelPage({ params }: PageProps) {
         setRemotePosition({ x: 0, y: 0 }); // 0,0 means it stays where CSS puts it initially
     }
   }, []);
+
+  const handleSubtitleToggle = () => {
+      if (!currentProgram) return;
+      
+      // We use the exact current elapsed seconds that our interval calculates every second
+      // This ensures the iframe restarts from the exact spot you are watching right now
+      setInitialOffset(currentOffsetRef.current);
+      setSubtitleLang(prev => prev === 'tr' ? null : 'tr');
+  };
 
   const handleRemoteDragStop = (e: any, data: { x: number, y: number }) => {
       setRemotePosition({ x: data.x, y: data.y });
@@ -163,6 +178,8 @@ export default function ChannelPage({ params }: PageProps) {
         const elapsedMinutes = adjustedCurrentMinutes - startTotalMinutes;
         const elapsedSeconds = elapsedMinutes * 60 + now.getSeconds();
         const totalSeconds = durationMinutes * 60;
+        
+        currentOffsetRef.current = Math.max(0, elapsedSeconds);
 
         if (totalSeconds > 0) {
             const p = (elapsedSeconds / totalSeconds) * 100;
@@ -351,53 +368,23 @@ export default function ChannelPage({ params }: PageProps) {
       {/* Audio element for zapping noise */}
       <audio ref={audioRef} src="/tv-noise-fx.wav" preload="auto" />
 
-      {/* 25px Dynamic Border around the whole screen */}
-      <div 
-        className={`absolute inset-0 z-50 pointer-events-none transition-opacity duration-500 ${showUI ? 'opacity-100' : 'opacity-0'}`}
-        style={{ border: `25px solid ${channel.color_primary || '#00FF4F'}` }}
-      ></div>
-
-      {/* Top Navigation - Right Corner Badge */}
-      <div className={`absolute top-8 right-8 z-50 transition-opacity duration-500 ${showUI ? 'opacity-100' : 'opacity-0'}`}>
-        <div className="flex flex-col items-end pointer-events-none mt-[25px] mr-[25px]">
-            {/* Channel Number (e.g. [01]) */}
-            <div 
-                className="text-6xl md:text-8xl font-bold tracking-widest leading-none mb-2"
-                style={{ color: channel.color_primary || '#00FF4F' }}
-            >
-                [{String(allChannels.findIndex(c => c.id === channel.id) + 1).padStart(2, '0')}]
-            </div>
-            {/* Channel Logo/Name Box */}
-            <div className="w-full flex justify-end">
-                <div className="bg-black py-2 flex justify-center w-full max-w-full">
-                    {channel.logo_corner ? (
-                        <img src={channel.logo_corner} alt={channel.name} className="h-8 md:h-12 object-contain" />
-                    ) : (
-                        <span className="text-white font-bold text-xl md:text-3xl uppercase tracking-widest">{channel.name}</span>
-                    )}
-                </div>
-            </div>
-        </div>
-      </div>
+      {/* 25px Dynamic Border around the whole screen & Top Navigation */}
+      <TVOverlay 
+          showUI={showUI} 
+          channel={channel} 
+          allChannels={allChannels} 
+      />
 
       {/* Main Player Area */}
       <div className="flex-grow relative bg-black flex items-center justify-center">
-        {/* Zapping Noise Overlay */}
-        {isZapping && (
-            <div className="absolute inset-0 z-[60] bg-black pointer-events-none flex items-center justify-center">
-                <img 
-                    src="/noise.gif" 
-                    alt="TV Noise" 
-                    className="w-full h-full object-cover mix-blend-screen"
-                />
-            </div>
-        )}
+        <ZappingNoise isZapping={isZapping} />
 
         {currentProgram ? (
             <StablePlayer 
                 url={`https://www.youtube.com/watch?v=${currentProgram.videoId}`}
                 initialStart={initialOffset}
                 volume={volume}
+                subtitleLang={subtitleLang}
             />
         ) : (
             <div className="text-center text-gray-500 z-10">
@@ -405,136 +392,37 @@ export default function ChannelPage({ params }: PageProps) {
             </div>
         )}
 
-        {/* Floating Program Info Card (Top Left) */}
-        <div className={`absolute top-8 left-8 z-40 max-w-[30%] min-w-[350px] transition-opacity duration-500 mt-[25px] ml-[25px] hover:opacity-100 ${showControls ? 'opacity-30' : 'opacity-0'}`}>
-            {currentProgram && (
-                <div 
-                    className="p-6 text-black border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]"
-                    style={{ backgroundColor: channel.color_primary || '#00FF4F' }}
-                >
-                    <h1 className="text-xl font-bold uppercase leading-tight mb-4">
-                        {currentProgram.title}
-                    </h1>
-                    
-                    <div className="mb-4">
-                        <span className="text-sm font-bold opacity-80">Youtube Creator:</span>
-                        <br />
-                        <span className="font-bold">{currentProgram.creator || channel.name}</span>
-                    </div>
+        <ProgramInfoCard 
+            showControls={showControls}
+            currentProgram={currentProgram}
+            nextProgram={nextProgram}
+            channel={channel}
+            progress={progress}
+        />
 
-                    <p className="text-sm font-medium mb-6 line-clamp-4">
-                        {currentProgram.description}
-                    </p>
-
-                    {/* Progress Bar Row */}
-                    <div className="flex items-center gap-4 mb-6 font-bold">
-                        <span>{currentProgram.startTime}</span>
-                        <div className="flex-1 h-3 bg-black relative">
-                            <div 
-                                className="absolute top-0 left-0 h-full transition-all duration-1000 ease-linear"
-                                style={{ 
-                                    width: `${progress}%`,
-                                    backgroundColor: 'rgba(255,255,255,0.8)' // A lighter fill over black track
-                                }}
-                            />
-                        </div>
-                        <span>{currentProgram.endTime}</span>
-                    </div>
-
-                    {/* Next Program */}
-                    {nextProgram && (
-                        <div className="border-t-2 border-black pt-4">
-                            <span className="text-sm font-bold opacity-80">Sonraki Program:</span>
-                            <br />
-                            <span className="font-bold uppercase">{nextProgram.title}</span>
-                        </div>
-                    )}
-                </div>
-            )}
-        </div>
-
-        {/* Floating Draggable Remote Control */}
-        {remotePosition !== undefined && (
-            <Draggable 
-                handle=".handle" 
-                nodeRef={draggableNodeRef}
-                position={remotePosition}
-                onStop={handleRemoteDragStop}
-                bounds="parent" // Keeps it inside the screen
-            >
-                <div ref={draggableNodeRef} className={`absolute bottom-16 right-16 z-50 bg-black border-4 border-white shadow-[8px_8px_0px_0px_rgba(255,255,255,1)] p-4 flex flex-col gap-4 transition-opacity duration-500 ${showControls ? 'opacity-100' : 'opacity-0'}`}>
-                    {/* Drag Handle */}
-                <div className="handle cursor-grab active:cursor-grabbing w-full flex justify-center pb-2 border-b-2 border-gray-800 text-gray-500 hover:text-white">
-                    <GripHorizontal size={24} />
-                </div>
-
-                <div className="flex gap-4">
-                    {/* Volume Controls */}
-                    <div className="flex flex-col items-center justify-between bg-gray-900 rounded-full p-2 border-2 border-gray-700">
-                        <button onClick={() => setVolume(v => Math.min(v + 10, 100))} className="p-2 hover:bg-white/20 rounded-full transition-colors text-white">
-                            <Volume2 size={20} />
-                        </button>
-                        <div className="text-xs font-bold text-white my-2">{volume}%</div>
-                        <button onClick={() => setVolume(v => Math.max(v - 10, 0))} className="p-2 hover:bg-white/20 rounded-full transition-colors text-white">
-                            <VolumeX size={20} />
-                        </button>
-                    </div>
-
-                    <div className="flex flex-col gap-4">
-                        {/* Channel Navigation */}
-                        <div className="flex items-center justify-between bg-gray-900 rounded-full p-2 border-2 border-gray-700">
-                            <button 
-                                onClick={() => {
-                                    const currentIndex = allChannels.findIndex(c => c.id === channel.id);
-                                    const prevIndex = (currentIndex - 1 + allChannels.length) % allChannels.length;
-                                    triggerZap(allChannels[prevIndex].slug);
-                                }}
-                                className="p-2 hover:bg-white/20 rounded-full transition-colors text-white"
-                            >
-                                <ChevronLeft size={24} />
-                            </button>
-                            <span className="font-bold text-white px-2">CH</span>
-                            <button 
-                                onClick={() => {
-                                    const currentIndex = allChannels.findIndex(c => c.id === channel.id);
-                                    const nextIndex = (currentIndex + 1) % allChannels.length;
-                                    triggerZap(allChannels[nextIndex].slug);
-                                }}
-                                className="p-2 hover:bg-white/20 rounded-full transition-colors text-white"
-                            >
-                                <ChevronRight size={24} />
-                            </button>
-                        </div>
-
-                        {/* Actions */}
-                        <div className="flex items-center gap-2 justify-center">
-                            <button 
-                                onClick={() => router.push('/')}
-                                className="p-3 bg-blue-600 hover:bg-blue-500 border-2 border-black text-white font-bold transition-colors shadow-[2px_2px_0px_0px_#FFF]"
-                                title="Kanal Listesi (Anasayfa)"
-                            >
-                                <List size={20} />
-                            </button>
-                            <button 
-                                onClick={copyLink}
-                                className="p-3 bg-pink-600 hover:bg-pink-500 border-2 border-black text-white font-bold transition-colors shadow-[2px_2px_0px_0px_#FFF]"
-                                title="Youtube Linkini Kopyala"
-                            >
-                                <Copy size={20} />
-                            </button>
-                            <button 
-                                onClick={handleFullscreen}
-                                className="p-3 bg-green-600 hover:bg-green-500 border-2 border-black text-white font-bold transition-colors shadow-[2px_2px_0px_0px_#FFF]"
-                                title="Tam Ekran"
-                            >
-                                <Maximize size={20} />
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            </Draggable>
-        )}
+        <RemoteControl 
+            remotePosition={remotePosition}
+            draggableNodeRef={draggableNodeRef}
+            showControls={showControls}
+            volume={volume}
+            setVolume={setVolume}
+            subtitleLang={subtitleLang}
+            onSubtitleToggle={handleSubtitleToggle}
+            handleRemoteDragStop={handleRemoteDragStop}
+            handleFullscreen={handleFullscreen}
+            copyLink={copyLink}
+            onPrevChannel={() => {
+                const currentIndex = allChannels.findIndex(c => c.id === channel.id);
+                const prevIndex = (currentIndex - 1 + allChannels.length) % allChannels.length;
+                triggerZap(allChannels[prevIndex].slug);
+            }}
+            onNextChannel={() => {
+                const currentIndex = allChannels.findIndex(c => c.id === channel.id);
+                const nextIndex = (currentIndex + 1) % allChannels.length;
+                triggerZap(allChannels[nextIndex].slug);
+            }}
+            onGoHome={() => router.push('/')}
+        />
       </div>
     </div>
   );
