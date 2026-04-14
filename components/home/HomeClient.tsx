@@ -1,6 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useGSAP } from '@gsap/react';
+import gsap from 'gsap';
 import { Channel, Program } from '../../data/mockData';
 import { getChannels, getProgramsForDate } from '../../lib/api';
 import ChannelDisplayCard from './ChannelDisplayCard';
@@ -8,10 +10,64 @@ import HomeSidebar from './HomeSidebar';
 import FooterNav from '../admin-v2/FooterNav';
 
 export default function HomeClient() {
+    const containerRef = useRef<HTMLDivElement>(null);
     const [channels, setChannels] = useState<Channel[]>([]);
     const [programs, setPrograms] = useState<Program[]>([]);
     const [timeMode, setTimeMode] = useState<'NOW' | 'NEXT'>('NOW');
     const [currentTime, setCurrentTime] = useState<Date | null>(null);
+
+    // GSAP Animations
+    useGSAP(() => {
+        // Timeline for the header entrance
+        const tl = gsap.timeline();
+
+        // 1. Header Box fades and scales in (like control panel)
+        tl.fromTo('.header-box', 
+            { scale: 0.95, opacity: 0 },
+            { scale: 1, opacity: 1, duration: 0.6, ease: 'power2.out' }
+        )
+        // 2. Title & Dots stagger in
+        .fromTo('.header-title, .header-dot', 
+            { x: -30, opacity: 0 },
+            { x: 0, opacity: 1, stagger: 0.1, duration: 0.5, ease: 'power2.out' }, 
+            "-=0.4"
+        )
+        // 3. Description lines stagger up
+        .fromTo('.header-desc-line', 
+            { y: 20, opacity: 0 },
+            { y: 0, opacity: 1, stagger: 0.15, duration: 0.6, ease: 'back.out(1.5)' }, 
+            "-=0.3"
+        )
+        // 4. Test screen image scales in
+        .fromTo('.header-image', 
+            { scale: 0.5, rotation: 15, opacity: 0 },
+            { scale: 1, rotation: 0, opacity: 1, duration: 0.8, ease: 'elastic.out(1, 0.5)' }, 
+            "-=0.8"
+        )
+        // 5. Control Panel & Banner pop in
+        .fromTo('.control-panel', 
+            { scale: 0.9, opacity: 0 },
+            { scale: 1, opacity: 1, duration: 0.5, ease: 'power2.out' }, 
+            "-=0.2"
+        );
+
+        // Channel Cards Entrance
+        if (channels.length > 0) {
+            gsap.fromTo('.channel-card-wrapper', 
+                { y: 60, opacity: 0 },
+                { y: 0, opacity: 1, duration: 0.6, stagger: 0.05, ease: 'back.out(1.2)', delay: 0.5 }
+            );
+        }
+
+        // Continuous subtle TV glitch effect on the main title
+        const glitchTl = gsap.timeline({ repeat: -1, repeatDelay: 3 });
+        glitchTl.to('.header-title', { x: 3, skewX: -10, duration: 0.05 })
+                .to('.header-title', { x: -3, skewX: 10, duration: 0.05 })
+                .to('.header-title', { x: 0, skewX: 0, duration: 0.05 })
+                .to('.header-title', { opacity: 0.8, duration: 0.05 })
+                .to('.header-title', { opacity: 1, duration: 0.05 });
+
+    }, { scope: containerRef, dependencies: [channels.length] });
 
     // Initial fetch
     useEffect(() => {
@@ -110,7 +166,7 @@ export default function HomeClient() {
         : 'YÜKLENİYOR...';
 
     return (
-        <div className="min-h-screen bg-[#ff6610] font-mono flex flex-col">
+        <div ref={containerRef} className="min-h-screen bg-[#ff6610] font-mono flex flex-col">
             <div className="w-full flex flex-col md:flex-row min-h-screen">
                 
                 {/* Left Content */}
@@ -118,39 +174,42 @@ export default function HomeClient() {
                     <div className="w-full max-w-6xl mx-auto flex flex-col h-full">
                         
                         {/* Header Block */}
-                        <div className="flex items-stretch justify-between mt-8 bg-black border-4 border-black p-8 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+                        <div className="header-box flex items-stretch justify-between mt-8 bg-black border-4 border-black p-8 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
                             <div className="flex-1 mr-8">
                                 <div className="text-white inline-flex items-center mb-6">
-                                    <h1 className="text-4xl md:text-5xl font-bold tracking-tighter lowercase">
+                                    <h1 className="header-title text-4xl md:text-5xl font-bold tracking-tighter lowercase">
                                         tvgibi.tv
                                     </h1>
                                     <div className="flex space-x-1 ml-3">
-                                        <div className="w-2 h-2 rounded-full bg-[#00FFFF]"></div>
-                                        <div className="w-2 h-2 rounded-full bg-[#FF00FF]"></div>
-                                        <div className="w-2 h-2 rounded-full bg-[#00FF00]"></div>
+                                        <div className="header-dot w-2 h-2 rounded-full bg-[#00FFFF]"></div>
+                                        <div className="header-dot w-2 h-2 rounded-full bg-[#FF00FF]"></div>
+                                        <div className="header-dot w-2 h-2 rounded-full bg-[#00FF00]"></div>
                                     </div>
                                 </div>
                                 <p className="text-white text-lg font-bold leading-relaxed mb-6">
-                                    Herkesin <span className="text-[#00FFFF]">aynı anda</span> izleyebildiği,<br />
-                                    <span className="text-[#FF0000]">youtube</span>'dan beslenen kanalları,<br />
-                                    <span className="text-[#00FFFF]">insan seçkisi</span> yayın akışıyla,<br />
-                                    <span className="text-[#00FF00]">7/24</span> yayında.. Tamamen bedava!
+                                    <span className="header-desc-line block">Herkesin <span className="text-[#00FFFF]">aynı anda</span> izleyebildiği,</span>
+                                    <span className="header-desc-line block"><span className="text-[#FF0000]">youtube</span>'dan beslenen kanalları,</span>
+                                    <span className="header-desc-line block"><span className="text-[#00FFFF]">insan seçkisi</span> yayın akışıyla,</span>
+                                    <span className="header-desc-line block"><span className="text-[#00FF00]">7/24</span> yayında.. Tamamen bedava!</span>
                                 </p>
-                                <p className="text-white text-lg font-bold">
+                                <p className="header-desc-line text-white text-lg font-bold">
                                     Bir TeleVizyon <span className="text-gray-400 opacity-50">simülasyonu..</span>
                                 </p>
                             </div>
                             
                             {/* Test Screen Image */}
-                            <div className="hidden md:block w-72 h-auto flex-shrink-0">
-                                <div className="w-full h-full bg-black">
+                            <div className="header-image hidden md:block w-72 h-auto flex-shrink-0 relative overflow-hidden group">
+                                {/* Adding a subtle hover effect to the image container */}
+                                <div className="w-full h-full bg-black relative z-10 transition-transform duration-500 group-hover:scale-105">
                                     <img src="/test-screen.png" alt="Test Screen" className="w-full h-full object-cover" />
                                 </div>
+                                {/* CRT Scanline Overlay */}
+                                <div className="absolute inset-0 pointer-events-none z-20 bg-[linear-gradient(rgba(255,255,255,0),rgba(255,255,255,0)_50%,rgba(0,0,0,0.1)_50%,rgba(0,0,0,0.1))] bg-[length:100%_4px] opacity-50"></div>
                             </div>
                         </div>
 
                         {/* Controls & Time Banner */}
-                        <div className="mt-8 flex flex-col md:flex-row md:items-start space-y-4 md:space-y-0 md:space-x-8">
+                        <div className="control-panel mt-8 flex flex-col md:flex-row md:items-start space-y-4 md:space-y-0 md:space-x-8">
                             {/* Toggle Buttons */}
                             <div className="flex flex-col space-y-2">
                                 <div className="flex space-x-2">
@@ -185,15 +244,16 @@ export default function HomeClient() {
                         </div>
 
                         {/* Channels Grid */}
-                        <div className="mt-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                        <div className="channel-grid mt-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                             {channels.map(channel => {
                                 const prog = getProgramForChannel(channel.id, timeMode);
                                 return (
-                                    <ChannelDisplayCard 
-                                        key={channel.id}
-                                        channel={channel}
-                                        program={prog}
-                                    />
+                                    <div key={channel.id} className="channel-card-wrapper">
+                                        <ChannelDisplayCard 
+                                            channel={channel}
+                                            program={prog}
+                                        />
+                                    </div>
                                 );
                             })}
                         </div>

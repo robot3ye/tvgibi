@@ -13,9 +13,9 @@ export default function ChannelDisplayCard({ channel, program }: ChannelDisplayC
     const bgColor = channel.color_primary || '#ff9c2f';
 
     return (
-        <Link href={`/channel/${channel.id}`} className="block h-full group">
+        <Link href={`/channel/${channel.id}`} className="block h-full group relative overflow-hidden">
             <div 
-                className="border-4 border-black h-full flex flex-col hover:opacity-95 transition-opacity"
+                className="border-4 border-black h-full flex flex-col"
                 style={{ backgroundColor: bgColor }}
             >
                 {/* Header / Logo Area */}
@@ -62,13 +62,18 @@ export default function ChannelDisplayCard({ channel, program }: ChannelDisplayC
                     </div>
 
                     {/* Creator Area */}
-                    <div className="mt-4 pt-4 border-t-2 border-black">
+                    <div className="mt-4 pt-4 border-t-2 border-black relative z-10">
                         <p className="text-black text-sm font-bold mb-1">Youtube Creator:</p>
                         <p className="text-black italic font-medium leading-tight">
                             {program?.creator ? program.creator : 'tvgibi.tv'}
                         </p>
                     </div>
                 </div>
+            </div>
+
+            {/* Hover Overlay: Slide down from top */}
+            <div className="absolute inset-0 bg-black flex items-center justify-center -translate-y-full group-hover:translate-y-0 transition-transform duration-500 ease-out z-20">
+                <span className="text-[#00FF00] font-mono text-5xl font-bold tracking-widest animate-pulse">İZLE_</span>
             </div>
         </Link>
     );

@@ -1,6 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useRef } from 'react';
+import { useGSAP } from '@gsap/react';
+import gsap from 'gsap';
 import { Channel } from '../../data/mockData';
 import Link from 'next/link';
 
@@ -9,9 +11,32 @@ interface HomeSidebarProps {
 }
 
 export default function HomeSidebar({ channels }: HomeSidebarProps) {
+    const sidebarRef = useRef<HTMLDivElement>(null);
+
+    useGSAP(() => {
+        if (channels.length > 0) {
+            const tl = gsap.timeline();
+            
+            tl.fromTo('.sidebar-header', 
+                { x: 50, opacity: 0 },
+                { x: 0, opacity: 1, duration: 0.5, ease: 'power2.out', delay: 0.8 }
+            )
+            .fromTo('.sidebar-link', 
+                { x: 30, opacity: 0 },
+                { x: 0, opacity: 1, duration: 0.4, stagger: 0.05, ease: 'back.out(1.2)' }, 
+                "-=0.2"
+            )
+            .fromTo('.sidebar-footer', 
+                { y: 50, opacity: 0 },
+                { y: 0, opacity: 1, duration: 0.5, ease: 'power2.out' }, 
+                "-=0.2"
+            );
+        }
+    }, { scope: sidebarRef, dependencies: [channels.length] });
+
     return (
-        <div className="h-full flex flex-col font-mono text-[#364153]">
-            <div className="bg-[#FF00FF] p-4 border-b-4 border-black">
+        <div ref={sidebarRef} className="h-full flex flex-col font-mono text-[#364153]">
+            <div className="sidebar-header bg-[#FF00FF] p-4 border-b-4 border-black">
                 <h2 className="text-3xl font-bold lowercase tracking-tighter text-white">kanal-list:</h2>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-2 pb-24 text-lg">
@@ -21,14 +46,14 @@ export default function HomeSidebar({ channels }: HomeSidebarProps) {
                         <Link 
                             key={channel.id} 
                             href={`/channel/${channel.id}`}
-                            className="block hover:text-black hover:bg-[#FF00FF] px-2 py-1 -mx-2 transition-colors cursor-pointer font-bold"
+                            className="sidebar-link block hover:text-black hover:bg-[#FF00FF] px-2 py-1 -mx-2 transition-colors cursor-pointer font-bold"
                         >
                             [{number}] {channel.name}
                         </Link>
                     );
                 })}
             </div>
-            <div className="p-4 border-t-4 border-black bg-[#00FF00] absolute bottom-0 w-full left-0">
+            <div className="sidebar-footer p-4 border-t-4 border-black bg-[#00FF00] absolute bottom-0 w-full left-0">
                 <button className="w-full bg-[#E0E0E0] text-black border-2 border-black py-2 rounded-full font-bold text-sm hover:bg-white transition-colors">
                     tvgibi.tv nedir?
                 </button>

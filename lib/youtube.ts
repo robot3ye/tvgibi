@@ -85,3 +85,58 @@ export const fetchVideoDetails = async (url: string): Promise<YouTubeVideoDetail
     return null;
   }
 };
+
+export const searchYouTubeVideos = async (query: string, maxResults: number = 10): Promise<YouTubeVideoDetails[]> => {
+    const apiKey = process.env.NEXT_PUBLIC_YOUTUBE_API_KEY;
+    if (!apiKey) {
+        console.error('YouTube API Key is missing');
+        return [];
+    }
+
+    try {
+        // Step 1: Search for videos
+        const searchResponse = await fetch(
+            `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=${maxResults}&q=${encodeURIComponent(query)}&key=${apiKey}`
+        );
+
+        if (!searchResponse.ok) {
+            console.error('YouTube Search API Error:', await searchResponse.json());
+            return [];
+        }
+
+        const searchData = await searchResponse.json();
+        if (!searchData.items || searchData.items.length === 0) return [];
+
+        // Extract video IDs
+        const videoIds = searchData.items.map((item: any) => item.id.videoId).join(',');
+
+        // Step 2: Fetch full details (for durations)
+        const videosResponse = await fetch(
+            `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&id=${videoIds}&key=${apiKey}`
+        );
+
+        if (!videosResponse.ok) {
+            console.error('YouTube Videos API Error:', await videosResponse.json());
+            return [];
+        }
+
+        const videosData = await videosResponse.json();
+        
+        return videosData.items.map((item: any) => {
+            const snippet = item.snippet;
+            const contentDetails = item.contentDetails;
+            return {
+                videoId: item.id,
+                title: snippet.title,
+                description: snippet.description,
+                thumbnail: snippet.thumbnails.maxres?.url || snippet.thumbnails.high?.url || snippet.thumbnails.default?.url,
+                duration: parseDuration(contentDetails.duration),
+                creator: snippet.channelTitle
+            };
+        });
+
+    } catch (error) {
+        console.error('Error searching YouTube:', error);
+        return [];
+    }
+};
