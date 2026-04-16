@@ -466,6 +466,7 @@ export default function ChannelPage({ params }: PageProps) {
             }}
             onOpenChannelList={() => setShowChannelListModal(true)}
             onGoHome={() => router.push('/')}
+            onOpenSchedule={() => router.push(`/schedule/${channel.slug}`)}
             channelColor={channel.color_primary || '#00FF4F'}
             onSelectChannelNumber={(num: number) => {
                 let targetIndex = num === 0 ? 9 : num - 1;

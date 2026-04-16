@@ -51,6 +51,7 @@ interface RemoteControlProps {
     onNextChannel: () => void;
     onOpenChannelList: () => void;
     onGoHome: () => void;
+    onOpenSchedule: () => void;
     channelColor: string;
     onSelectChannelNumber: (num: number) => void;
 }
@@ -70,6 +71,7 @@ export default function RemoteControl({
     onNextChannel,
     onOpenChannelList,
     onGoHome,
+    onOpenSchedule,
     channelColor,
     onSelectChannelNumber
 }: RemoteControlProps) {
@@ -248,7 +250,7 @@ export default function RemoteControl({
                         <button onClick={handleFullscreen} className="text-left font-mono font-bold text-black hover:underline hover:opacity-70 transition-opacity">
                             _Tam ekrana moduna geç
                         </button>
-                        <button className="text-left font-mono font-bold text-black hover:underline hover:opacity-70 transition-opacity">
+                        <button onClick={onOpenSchedule} className="text-left font-mono font-bold text-black hover:underline hover:opacity-70 transition-opacity">
                             _Yayın akışını incele
                         </button>
                     </div>
