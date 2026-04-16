@@ -7,16 +7,55 @@ import Link from 'next/link';
 interface ChannelDisplayCardProps {
     channel: Channel;
     program: Program | null;
+    nextProgram?: Program | null;
+    currentTime?: Date | null;
 }
 
-export default function ChannelDisplayCard({ channel, program }: ChannelDisplayCardProps) {
+export default function ChannelDisplayCard({ channel, program, nextProgram, currentTime }: ChannelDisplayCardProps) {
     const bgColor = channel.color_primary || '#ff9c2f';
     const [isHovered, setIsHovered] = useState(false);
     const [displayedText, setDisplayedText] = useState('');
     const [typingIndex, setTypingIndex] = useState(0);
 
+    // Calculate remaining time
+    let remainingText = '';
+    if (program && currentTime) {
+        const [endH, endM] = program.endTime.split(':').map(Number);
+        const currH = currentTime.getHours();
+        const currM = currentTime.getMinutes();
+        const currS = currentTime.getSeconds();
+        
+        let endTotalM = endH * 60 + endM;
+        let currTotalM = currH * 60 + currM;
+        
+        // Handle midnight crossing
+        if (endTotalM < currTotalM && endTotalM < 6 * 60) {
+            endTotalM += 24 * 60;
+        }
+
+        const diffMinutes = endTotalM - currTotalM;
+        if (diffMinutes > 0) {
+            const remainingMins = diffMinutes - 1; // Since we are showing seconds, we subtract 1 minute
+            const remainingSecs = 60 - currS;
+            remainingText = `BU PROGRAMIN BİTMESİNE ${remainingMins} DK ${remainingSecs} SN KALDI..`;
+        } else {
+            remainingText = 'PROGRAM BİTMEK ÜZERE..';
+        }
+    } else if (program) {
+        // Fallback if currentTime is not available
+        remainingText = 'SÜRE HESAPLANIYOR..';
+    }
+
+    // Next Program Text
+    let nextText = '';
+    if (nextProgram) {
+        nextText = `BİR SONRAKİ PROGRAM_\n> TITLE: ${nextProgram.title}\n> CREATOR: ${nextProgram.creator || 'tvgibi.tv'}`;
+    } else {
+        nextText = `BİR SONRAKİ PROGRAM_\n> YAYIN AKIŞI BULUNAMADI`;
+    }
+
     const terminalText = program 
-        ? `> STATUS: YAYINDA\n> TIME: ${program.startTime} - ${program.endTime}\n\n> TITLE: ${program.title}\n> CREATOR: ${program.creator || 'tvgibi.tv'}\n\n[ BAĞLANTI KURULUYOR... ]`
+        ? `[ BAĞLANTI KURULDU... ]\n\n${remainingText}\n\n${nextText}\n\n[ KANAL AKTİF... ]\n\nİZLEMEK İÇİN TIKLA...`
         : `> STATUS: OFFLINE\n> NO SIGNAL DETECTED\n\n[ BEKLEYİNİZ... ]`;
 
     // Typewriter effect logic
@@ -31,7 +70,7 @@ export default function ChannelDisplayCard({ channel, program }: ChannelDisplayC
             const timeout = setTimeout(() => {
                 setDisplayedText(prev => prev + terminalText.charAt(typingIndex));
                 setTypingIndex(prev => prev + 1);
-            }, 15); // Speed of typing (15ms per char for fast terminal feel)
+            }, 10); // Speed of typing
             return () => clearTimeout(timeout);
         }
     }, [isHovered, typingIndex, terminalText]);
@@ -124,7 +163,7 @@ export default function ChannelDisplayCard({ channel, program }: ChannelDisplayC
 
                 {/* Terminal Typewriter Text */}
                 <div className="flex-1 overflow-hidden relative mt-2">
-                    <pre className="text-[#00FF00] font-mono text-sm whitespace-pre-wrap leading-relaxed drop-shadow-[0_0_5px_rgba(0,255,0,0.8)]">
+                    <pre className="text-[#00FF00] font-mono text-[10px] md:text-xs lg:text-sm whitespace-pre-wrap leading-tight md:leading-relaxed drop-shadow-[0_0_5px_rgba(0,255,0,0.8)]">
                         {displayedText}
                         <span className="animate-pulse">_</span>
                     </pre>
@@ -132,7 +171,7 @@ export default function ChannelDisplayCard({ channel, program }: ChannelDisplayC
                 
                 {/* Flashing "İZLE" prompt at bottom */}
                 <div className="mt-auto pt-4 flex justify-between items-center border-t-2 border-[#00FF00]/30 text-[#00FF00] font-mono font-bold">
-                    <span className="text-xs opacity-50">C:\tvgibi\run.exe</span>
+                    <span className="text-xs opacity-50 hidden md:block">C:\tvgibi\run.exe</span>
                     <span className="animate-pulse tracking-widest text-lg">İZLE {'>'}</span>
                 </div>
             </div>

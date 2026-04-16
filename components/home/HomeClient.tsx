@@ -235,11 +235,14 @@ export default function HomeClient() {
                         <div className="channel-grid mt-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                             {channels.map(channel => {
                                 const prog = getProgramForChannel(channel.id, timeMode);
+                                const nextProg = getProgramForChannel(channel.id, 'NEXT');
                                 return (
                                     <div key={channel.id} className="channel-card-wrapper">
                                         <ChannelDisplayCard 
                                             channel={channel}
                                             program={prog}
+                                            nextProgram={nextProg}
+                                            currentTime={currentTime}
                                         />
                                     </div>
                                 );
