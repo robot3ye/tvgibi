@@ -107,6 +107,7 @@ export default function ChannelPage({ params }: PageProps) {
 
   // Fetch Channel Details
   useEffect(() => {
+    let isCancelled = false;
     const fetchChannel = async () => {
         // Clear current program when slug changes so we don't show old video during noise
         setCurrentProgram(null);
@@ -114,28 +115,32 @@ export default function ChannelPage({ params }: PageProps) {
         lastProgramIdRef.current = null;
         
         const channels = await getChannels();
+        if (isCancelled) return;
         setAllChannels(channels);
         const found = channels.find(c => c.slug === activeSlug);
         setChannel(found || null);
     };
     fetchChannel();
+    return () => {
+        isCancelled = true;
+    };
   }, [activeSlug]);
 
   // Optimized Schedule Logic
   useEffect(() => {
-    if (!channel) return;
+    if (!channel || channel.slug !== activeSlug) return;
+    let isCancelled = false;
     setMounted(true);
 
     const fetchProgram = async () => {
+        if (isCancelled) return;
         const { current, next, offset } = await getCurrentProgram(channel.id);
+        if (isCancelled) return;
         
         if (current) {
-             // Use the offset returned from API which is calculated based on start_time
-             // Or verify it matches current local time
-             
              if (lastProgramIdRef.current !== current.id) {
                 lastProgramIdRef.current = current.id;
-                setInitialOffset(offset); // API calculates this correctly
+                setInitialOffset(offset);
                 setCurrentProgram(current);
                 setNextProgram(next);
             }
@@ -152,7 +157,14 @@ export default function ChannelPage({ params }: PageProps) {
     // Polling interval (e.g., every 10 seconds to check for updates/sync)
     const pollInterval = setInterval(fetchProgram, 10000);
 
-    // Local Progress Update Interval (runs every second for smooth UI)
+    return () => {
+        isCancelled = true;
+        clearInterval(pollInterval);
+    };
+  }, [channel, activeSlug]);
+
+  // Local Progress Update Interval (runs every second for smooth UI)
+  useEffect(() => {
     const progressInterval = setInterval(() => {
         if (!currentProgram) {
             setProgress(0);
@@ -168,7 +180,6 @@ export default function ChannelPage({ params }: PageProps) {
         if (endTotalMinutes < startTotalMinutes) endTotalMinutes += 24 * 60; // Cross midnight
 
         const currentTotalMinutes = now.getHours() * 60 + now.getMinutes();
-        // Handle midnight crossover for current time if needed (complex, but assuming same day for simple MVP)
         let adjustedCurrentMinutes = currentTotalMinutes;
         if (adjustedCurrentMinutes < startTotalMinutes && (startTotalMinutes - adjustedCurrentMinutes) > 12 * 60) {
             adjustedCurrentMinutes += 24 * 60;
@@ -185,18 +196,12 @@ export default function ChannelPage({ params }: PageProps) {
             const p = (elapsedSeconds / totalSeconds) * 100;
             setProgress(Math.min(Math.max(p, 0), 100));
             
-            // If finished, trigger immediate fetch
-            if (p >= 100) {
-                fetchProgram();
-            }
+            // If finished, polling interval will catch it within 10 seconds.
         }
     }, 1000);
 
-    return () => {
-        clearInterval(pollInterval);
-        clearInterval(progressInterval);
-    };
-  }, [channel, currentProgram]); // Re-run if channel changes or current program updates (to update closure vars)
+    return () => clearInterval(progressInterval);
+  }, [currentProgram]);
 
 
   // Helper for Zapping Effect
