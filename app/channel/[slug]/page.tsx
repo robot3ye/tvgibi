@@ -40,7 +40,12 @@ export default function ChannelPage({ params }: PageProps) {
   const [showUI, setShowUI] = useState(true); // Control border, logo, channel num
   const [hasInteracted, setHasInteracted] = useState(true); // Default true, checked in effect
   const [isZapping, setIsZapping] = useState(false);
+  const [showVolumeOSD, setShowVolumeOSD] = useState(false);
+  const [showSubtitleOSD, setShowSubtitleOSD] = useState(false);
+  const [showChannelListModal, setShowChannelListModal] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const volumeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const subtitleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Track remote control position across channel changes
   // Provide a default fallback position for SSR / initial render
@@ -90,13 +95,27 @@ export default function ChannelPage({ params }: PageProps) {
     }
   }, []);
 
+  const handleVolumeChange = (newVolume: number | ((prev: number) => number)) => {
+      setVolume(prev => {
+          const calculatedVolume = typeof newVolume === 'function' ? newVolume(prev) : newVolume;
+          
+          setShowVolumeOSD(true);
+          if (volumeTimeoutRef.current) clearTimeout(volumeTimeoutRef.current);
+          volumeTimeoutRef.current = setTimeout(() => setShowVolumeOSD(false), 2000);
+          
+          return calculatedVolume;
+      });
+  };
+
   const handleSubtitleToggle = () => {
       if (!currentProgram) return;
       
-      // We use the exact current elapsed seconds that our interval calculates every second
-      // This ensures the iframe restarts from the exact spot you are watching right now
       setInitialOffset(currentOffsetRef.current);
       setSubtitleLang(prev => prev === 'tr' ? null : 'tr');
+      
+      setShowSubtitleOSD(true);
+      if (subtitleTimeoutRef.current) clearTimeout(subtitleTimeoutRef.current);
+      subtitleTimeoutRef.current = setTimeout(() => setShowSubtitleOSD(false), 2000);
   };
 
   const handleRemoteDragStop = (e: any, data: { x: number, y: number }) => {
@@ -261,10 +280,10 @@ export default function ChannelPage({ params }: PageProps) {
           // Volume controls
           if (e.key === 'ArrowUp') {
               e.preventDefault();
-              setVolume(v => Math.min(v + 10, 100));
+              handleVolumeChange(Math.min(volume + 10, 100));
           } else if (e.key === 'ArrowDown') {
               e.preventDefault();
-              setVolume(v => Math.max(v - 10, 0));
+              handleVolumeChange(Math.max(volume - 10, 0));
           }
           
           // Channel Navigation
@@ -405,12 +424,31 @@ export default function ChannelPage({ params }: PageProps) {
             progress={progress}
         />
 
+        {/* Volume OSD */}
+        <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[80] pointer-events-none transition-opacity duration-300 ${showVolumeOSD ? 'opacity-100' : 'opacity-0'}`}>
+            <div className="flex items-center gap-4 bg-black/80 px-8 py-6 rounded-3xl border-4" style={{ borderColor: channel.color_primary || '#00FF4F' }}>
+                {volume === 0 ? <VolumeX size={64} color={channel.color_primary || '#00FF4F'} /> : <Volume2 size={64} color={channel.color_primary || '#00FF4F'} />}
+                <div className="text-6xl font-black font-mono" style={{ color: channel.color_primary || '#00FF4F' }}>
+                    {volume}%
+                </div>
+            </div>
+        </div>
+
+        {/* Subtitle OSD */}
+        <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[80] pointer-events-none transition-opacity duration-300 ${showSubtitleOSD ? 'opacity-100' : 'opacity-0'}`}>
+            <div className="flex items-center gap-4 bg-black/80 px-8 py-6 rounded-3xl border-4" style={{ borderColor: channel.color_primary || '#00FF4F' }}>
+                <div className="text-5xl font-black font-mono uppercase" style={{ color: channel.color_primary || '#00FF4F' }}>
+                    ALTYAZI: {subtitleLang === 'tr' ? 'AÇIK' : 'KAPALI'}
+                </div>
+            </div>
+        </div>
+
         <RemoteControl 
             remotePosition={remotePosition}
             draggableNodeRef={draggableNodeRef}
             showControls={showControls}
             volume={volume}
-            setVolume={setVolume}
+            setVolume={handleVolumeChange}
             subtitleLang={subtitleLang}
             onSubtitleToggle={handleSubtitleToggle}
             handleRemoteDragStop={handleRemoteDragStop}
@@ -426,8 +464,54 @@ export default function ChannelPage({ params }: PageProps) {
                 const nextIndex = (currentIndex + 1) % allChannels.length;
                 triggerZap(allChannels[nextIndex].slug);
             }}
+            onOpenChannelList={() => setShowChannelListModal(true)}
             onGoHome={() => router.push('/')}
+            channelColor={channel.color_primary || '#00FF4F'}
+            onSelectChannelNumber={(num: number) => {
+                let targetIndex = num === 0 ? 9 : num - 1;
+                if (targetIndex >= 0 && targetIndex < allChannels.length) {
+                    triggerZap(allChannels[targetIndex].slug);
+                }
+            }}
         />
+
+        {/* Channel List Modal */}
+        {showChannelListModal && (
+            <div className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-8 backdrop-blur-sm">
+                <div className="w-full max-w-4xl bg-black border-4 border-white shadow-[12px_12px_0px_0px_#FFF] p-8 flex flex-col gap-6 max-h-[80vh] overflow-y-auto">
+                    <div className="flex items-center justify-between border-b-4 border-white pb-4">
+                        <h2 className="text-4xl font-bold text-[#00FF4F] uppercase tracking-widest">Kanal_ Index</h2>
+                        <button 
+                            onClick={() => setShowChannelListModal(false)}
+                            className="text-white hover:text-red-500 font-bold text-3xl transition-colors"
+                        >
+                            X
+                        </button>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+                        {allChannels.map((c, idx) => (
+                            <button
+                                key={c.id}
+                                onClick={() => {
+                                    triggerZap(c.slug);
+                                    setShowChannelListModal(false);
+                                }}
+                                className={`p-4 border-2 border-white flex flex-col items-center justify-center gap-3 transition-transform hover:scale-105 ${activeSlug === c.slug ? 'bg-white/20' : 'bg-black hover:bg-gray-900'}`}
+                                style={{ borderColor: c.color_primary || '#FFF' }}
+                            >
+                                <span className="text-3xl font-black" style={{ color: c.color_primary || '#FFF' }}>{idx + 1 === 10 ? 0 : idx + 1}</span>
+                                {c.logo_main ? (
+                                    <img src={c.logo_main} alt={c.name} className="h-12 object-contain" />
+                                ) : (
+                                    <span className="font-bold">{c.name}</span>
+                                )}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        )}
       </div>
     </div>
   );
