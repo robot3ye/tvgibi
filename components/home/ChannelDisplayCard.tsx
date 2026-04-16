@@ -1,9 +1,8 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React from 'react';
 import { Channel, Program } from '../../data/mockData';
 import Link from 'next/link';
-import gsap from 'gsap';
 
 interface ChannelDisplayCardProps {
     channel: Channel;
@@ -12,35 +11,9 @@ interface ChannelDisplayCardProps {
 
 export default function ChannelDisplayCard({ channel, program }: ChannelDisplayCardProps) {
     const bgColor = channel.color_primary || '#ff9c2f';
-    const overlayRef = useRef<HTMLDivElement>(null);
-    const [isAnimating, setIsAnimating] = useState(false);
-
-    const handleMouseEnter = () => {
-        if (isAnimating || !overlayRef.current) return;
-        setIsAnimating(true);
-
-        const tl = gsap.timeline({
-            onComplete: () => {
-                setIsAnimating(false);
-            }
-        });
-
-        // 1. Enter from top
-        tl.fromTo(overlayRef.current, 
-            { yPercent: -100 },
-            { yPercent: 0, duration: 0.5, ease: 'power2.out' }
-        )
-        // 2. Stay for 2 seconds
-        .to({}, { duration: 2 })
-        // 3. Exit to bottom
-        .to(overlayRef.current, 
-            { yPercent: 100, duration: 0.5, ease: 'power2.in' }
-        );
-    };
 
     return (
-        <div onMouseEnter={handleMouseEnter} className="block h-full relative overflow-hidden cursor-pointer group">
-            <Link href={`/channel/${channel.slug}`} className="block h-full">
+        <Link href={`/channel/${channel.slug}`} className="block h-full group relative overflow-hidden">
             <div 
                 className="border-4 border-black h-full flex flex-col"
                 style={{ backgroundColor: bgColor }}
@@ -97,16 +70,11 @@ export default function ChannelDisplayCard({ channel, program }: ChannelDisplayC
                     </div>
                 </div>
             </div>
-            </Link>
 
-            {/* Hover Overlay: Slide down from top, wait 2s, slide down out */}
-            <div 
-                ref={overlayRef}
-                className="absolute inset-0 bg-black flex items-center justify-center z-20 pointer-events-none"
-                style={{ transform: 'translateY(-100%)' }} // Initial state hidden above
-            >
+            {/* Hover Overlay: Slide down from top */}
+            <div className="absolute inset-0 bg-black flex items-center justify-center -translate-y-full group-hover:translate-y-0 transition-transform duration-500 ease-out z-20">
                 <span className="text-[#00FF00] font-mono text-5xl font-bold tracking-widest animate-pulse">İZLE_</span>
             </div>
-        </div>
+        </Link>
     );
 }
