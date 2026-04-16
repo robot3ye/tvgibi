@@ -21,34 +21,22 @@ export default function HomeClient() {
         // Timeline for the header entrance
         const tl = gsap.timeline();
 
-        // 1. Header Box fades and scales in (like control panel)
-        tl.fromTo('.header-box', 
-            { scale: 0.95, opacity: 0 },
-            { scale: 1, opacity: 1, duration: 0.6, ease: 'power2.out' }
-        )
-        // 2. Title & Dots stagger in
-        .fromTo('.header-title, .header-dot', 
+        // Title & Dots stagger in (Header Box animation removed)
+        tl.fromTo('.header-title, .header-dot', 
             { x: -30, opacity: 0 },
-            { x: 0, opacity: 1, stagger: 0.1, duration: 0.5, ease: 'power2.out' }, 
-            "-=0.4"
+            { x: 0, opacity: 1, stagger: 0.1, duration: 0.5, ease: 'power2.out' }
         )
-        // 3. Description lines stagger up
+        // Description lines stagger up
         .fromTo('.header-desc-line', 
             { y: 20, opacity: 0 },
             { y: 0, opacity: 1, stagger: 0.15, duration: 0.6, ease: 'back.out(1.5)' }, 
             "-=0.3"
         )
-        // 4. Test screen image scales in
+        // Test screen image scales in
         .fromTo('.header-image', 
             { scale: 0.5, rotation: 15, opacity: 0 },
             { scale: 1, rotation: 0, opacity: 1, duration: 0.8, ease: 'elastic.out(1, 0.5)' }, 
             "-=0.8"
-        )
-        // 5. Control Panel & Banner pop in
-        .fromTo('.control-panel', 
-            { scale: 0.9, opacity: 0 },
-            { scale: 1, opacity: 1, duration: 0.5, ease: 'power2.out' }, 
-            "-=0.2"
         );
 
         // Channel Cards Entrance
