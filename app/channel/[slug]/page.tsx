@@ -91,7 +91,10 @@ export default function ChannelPage({ params }: PageProps) {
     if (savedX && savedY) {
         setRemotePosition({ x: parseFloat(savedX), y: parseFloat(savedY) });
     } else {
-        setRemotePosition({ x: 0, y: 0 }); // 0,0 means it stays where CSS puts it initially
+        // Put it at bottom-right initially based on screen size
+        const startX = window.innerWidth - 320 - 64; 
+        const startY = window.innerHeight - 550 - 64;
+        setRemotePosition({ x: startX > 0 ? startX : 0, y: startY > 0 ? startY : 0 });
     }
   }, []);
 
