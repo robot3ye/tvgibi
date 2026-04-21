@@ -13,52 +13,25 @@ export default function HomeClient() {
     const containerRef = useRef<HTMLDivElement>(null);
     const [channels, setChannels] = useState<Channel[]>([]);
     const [programs, setPrograms] = useState<Program[]>([]);
-    const [timeMode, setTimeMode] = useState<'NOW' | 'NEXT'>('NOW');
+    const timeMode = 'NOW'; // Fixed to NOW since toggle buttons were removed
     const [currentTime, setCurrentTime] = useState<Date | null>(null);
 
     // GSAP Animations
     useGSAP(() => {
-        // Timeline for the header entrance
-        const tl = gsap.timeline();
-
-        // Title & Dots stagger in (Header Box animation removed)
-        tl.fromTo('.header-title, .header-dot', 
-            { x: -30, opacity: 0 },
-            { x: 0, opacity: 1, stagger: 0.1, duration: 0.5, ease: 'power2.out' }
-        )
-        // Description lines stagger up
-        .fromTo('.header-desc-line', 
-            { y: 20, opacity: 0 },
-            { y: 0, opacity: 1, stagger: 0.15, duration: 0.6, ease: 'back.out(1.5)' }, 
-            "-=0.3"
-        )
-        // Test screen image scales in
-        .fromTo('.header-image', 
-            { scale: 0.5, rotation: 15, opacity: 0 },
-            { scale: 1, rotation: 0, opacity: 1, duration: 0.8, ease: 'elastic.out(1, 0.5)' }, 
-            "-=0.8"
-        );
-
         // Channel Cards Entrance
         if (channels.length > 0) {
             gsap.fromTo('.channel-card-wrapper', 
                 { y: 60, opacity: 0 },
-                { y: 0, opacity: 1, duration: 0.6, stagger: 0.05, ease: 'back.out(1.2)', delay: 0.5 }
+                { y: 0, opacity: 1, duration: 0.6, stagger: 0.05, ease: 'back.out(1.2)', delay: 0.2 }
             );
         }
-
-        // Continuous subtle TV glitch effect on the main title
-        const glitchTl = gsap.timeline({ repeat: -1, repeatDelay: 3 });
-        glitchTl.to('.header-title', { x: 3, skewX: -10, duration: 0.05 })
-                .to('.header-title', { x: -3, skewX: 10, duration: 0.05 })
-                .to('.header-title', { x: 0, skewX: 0, duration: 0.05 })
-                .to('.header-title', { opacity: 0.8, duration: 0.05 })
-                .to('.header-title', { opacity: 1, duration: 0.05 });
-
     }, { scope: containerRef, dependencies: [channels.length] });
+
+    const [isMounted, setIsMounted] = useState(false);
 
     // Initial fetch
     useEffect(() => {
+        setIsMounted(true);
         const loadData = async () => {
             const fetchedChannels = await getChannels();
             // Sadece online olanları gösterelim
@@ -84,7 +57,6 @@ export default function HomeClient() {
         return () => clearInterval(interval);
     }, []);
 
-    // Helper: Find NOW program for a channel
     const getProgramForChannel = (channelId: string, mode: 'NOW' | 'NEXT') => {
         if (!currentTime) return null;
         
@@ -153,6 +125,18 @@ export default function HomeClient() {
         ? `${daysTr[currentTime.getDay()]} ${currentTime.getHours().toString().padStart(2, '0')}:${currentTime.getMinutes().toString().padStart(2, '0')}`
         : 'YÜKLENİYOR...';
 
+    // Send time to iframe
+    useEffect(() => {
+        const iframe = document.getElementById('hero-iframe') as HTMLIFrameElement;
+        if (iframe && iframe.contentWindow) {
+            iframe.contentWindow.postMessage({ type: 'UPDATE_TIME', payload: timeString }, '*');
+        }
+    }, [timeString]);
+
+    if (!isMounted) {
+        return <div className="min-h-screen bg-black"></div>;
+    }
+
     return (
         <div ref={containerRef} className="min-h-screen bg-[#ff6610] font-mono flex flex-col">
             <div className="w-full flex flex-col md:flex-row min-h-screen">
@@ -161,74 +145,15 @@ export default function HomeClient() {
                 <div className="flex-1 flex flex-col pl-[50px] pr-8 pb-12">
                     <div className="w-full max-w-6xl mx-auto flex flex-col h-full">
                         
-                        {/* Header Block */}
-                        <div className="header-box flex items-stretch justify-between mt-8 bg-black border-4 border-black p-8 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
-                            <div className="flex-1 mr-8">
-                                <div className="text-white inline-flex items-center mb-6">
-                                    <h1 className="header-title text-4xl md:text-5xl font-bold tracking-tighter lowercase">
-                                        tvgibi.tv
-                                    </h1>
-                                    <div className="flex space-x-1 ml-3">
-                                        <div className="header-dot w-2 h-2 rounded-full bg-[#00FFFF]"></div>
-                                        <div className="header-dot w-2 h-2 rounded-full bg-[#FF00FF]"></div>
-                                        <div className="header-dot w-2 h-2 rounded-full bg-[#00FF00]"></div>
-                                    </div>
-                                </div>
-                                <p className="text-white text-lg font-bold leading-relaxed mb-6">
-                                    <span className="header-desc-line block">Herkesin <span className="text-[#00FFFF]">aynı anda</span> izleyebildiği,</span>
-                                    <span className="header-desc-line block"><span className="text-[#FF0000]">youtube</span>'dan beslenen kanalları,</span>
-                                    <span className="header-desc-line block"><span className="text-[#00FFFF]">insan seçkisi</span> yayın akışıyla,</span>
-                                    <span className="header-desc-line block"><span className="text-[#00FF00]">7/24</span> yayında.. Tamamen bedava!</span>
-                                </p>
-                                <p className="header-desc-line text-white text-lg font-bold">
-                                    Bir TeleVizyon <span className="text-gray-400 opacity-50">simülasyonu..</span>
-                                </p>
-                            </div>
-                            
-                            {/* Test Screen Image */}
-                            <div className="header-image hidden md:block w-72 h-auto flex-shrink-0 relative overflow-hidden group">
-                                {/* Adding a subtle hover effect to the image container */}
-                                <div className="w-full h-full bg-black relative z-10 transition-transform duration-500 group-hover:scale-105">
-                                    <img src="/test-screen.png" alt="Test Screen" className="w-full h-full object-cover" />
-                                </div>
-                                {/* CRT Scanline Overlay */}
-                                <div className="absolute inset-0 pointer-events-none z-20 bg-[linear-gradient(rgba(255,255,255,0),rgba(255,255,255,0)_50%,rgba(0,0,0,0.1)_50%,rgba(0,0,0,0.1))] bg-[length:100%_4px] opacity-50"></div>
-                            </div>
-                        </div>
-
-                        {/* Controls & Time Banner */}
-                        <div className="control-panel mt-8 flex flex-col md:flex-row md:items-start space-y-4 md:space-y-0 md:space-x-8">
-                            {/* Toggle Buttons */}
-                            <div className="flex flex-col space-y-2">
-                                <div className="flex space-x-2">
-                                    <button 
-                                        onClick={() => setTimeMode('NOW')}
-                                        className={`px-8 py-2 font-bold uppercase border-4 border-black transition-colors ${
-                                            timeMode === 'NOW' ? 'bg-[#00FF00] text-black' : 'bg-[#00FF00] text-black hover:bg-white'
-                                        }`}
-                                    >
-                                        ŞU_AN
-                                    </button>
-                                    <button 
-                                        onClick={() => setTimeMode('NEXT')}
-                                        className={`px-8 py-2 font-bold uppercase border-4 border-black transition-colors ${
-                                            timeMode === 'NEXT' ? 'bg-[#FF00FF] text-black' : 'bg-[#FF00FF] text-black hover:bg-white'
-                                        }`}
-                                    >
-                                        AZ_SONRA
-                                    </button>
-                                </div>
-                                <div className="bg-[#0066FF] text-white border-4 border-black px-4 py-1 font-bold uppercase text-center">
-                                    {timeMode === 'NOW' ? 'ŞU_AN BUNLAR YAYINDA:' : 'AZ_SONRA BUNLAR YAYINDA:'}
-                                </div>
-                            </div>
-
-                            {/* Time Banner */}
-                            <div className="flex-1 bg-[#feff01] border-4 border-black flex items-center justify-center py-4">
-                                <h2 className="text-4xl md:text-5xl font-bold uppercase tracking-widest text-black">
-                                    {timeString}
-                                </h2>
-                            </div>
+                        {/* Hero Section */}
+                        <div className="relative w-full mt-8 mb-2 border-4 border-black bg-black overflow-hidden" style={{ aspectRatio: '16/9' }}>
+                            <iframe 
+                                id="hero-iframe"
+                                src="/hero/index.html" 
+                                className="absolute inset-0 w-full h-full border-0 pointer-events-auto"
+                                title="tvgibi.tv hero"
+                                allow="autoplay; fullscreen"
+                            />
                         </div>
 
                         {/* Channels Grid */}
