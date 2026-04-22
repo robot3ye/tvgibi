@@ -192,7 +192,7 @@ export default function HomeClient() {
                     </div>
 
                     {/* Right Sidebar */}
-                    <div className="w-full md:w-80 flex-shrink-0 bg-[#00FF00] border-l-4 border-black border-b-4 md:border-b-0 sticky top-0 h-screen overflow-hidden">
+                    <div className="w-full md:w-80 flex-shrink-0 bg-[#00FF00] border-l-4 border-black border-b-4 md:border-b-0 sticky top-0 h-screen overflow-hidden" data-lenis-prevent>
                         <HomeSidebar channels={channels} />
                     </div>
                 </div>
