@@ -118,10 +118,16 @@ export default function RemoteControl({
             <div 
                 ref={draggableNodeRef} 
                 className={`absolute z-50 transition-opacity duration-500 ${showControls ? 'opacity-100' : 'opacity-0'}`}
-                style={{ transform: `scale(${scale})`, transformOrigin: 'top left' }}
+                style={{ 
+                    width: '320px',
+                    height: '550px'
+                }}
             >
                 {/* Remote Container: 320px wide, ~550px high */}
-                <div className="w-[320px] h-[550px] bg-white/40 backdrop-blur-md border-[6px] border-black flex flex-col">
+                <div 
+                    className="w-full h-full bg-white/40 backdrop-blur-md border-[6px] border-black flex flex-col"
+                    style={{ transform: `scale(${scale})`, transformOrigin: 'top left' }}
+                >
 
                     
                     {/* TOP BAR: Drag Handle */}
