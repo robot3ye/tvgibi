@@ -52,6 +52,10 @@ function AdminScheduleContent() {
     // Toast
     const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
 
+    // Bulk Actions Bar State
+    const [targetChannelId, setTargetChannelId] = useState<string>('');
+    const [targetDate, setTargetDate] = useState<string>('');
+
     // --- Effects ---
 
     // 1. Load Channels
@@ -392,6 +396,133 @@ function AdminScheduleContent() {
         }
     };
 
+    const handleCopySelected = async () => {
+        if (!targetChannelId || !targetDate || selectedProgramIds.length === 0) {
+            setToast({ message: 'Lütfen hedef kanal ve gün seçiniz.', type: 'error' });
+            return;
+        }
+        setAdding(true);
+        try {
+            const programsToCopy = displayedPrograms.filter(p => selectedProgramIds.includes(p.id));
+            programsToCopy.sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+            const targetDayPrograms = await getProgramsForChannel(targetChannelId);
+            const filteredTargetDayPrograms = targetDayPrograms.filter(p => p.date === targetDate);
+            filteredTargetDayPrograms.sort((a, b) => a.startTime.localeCompare(b.startTime));
+            const lastProg = filteredTargetDayPrograms[filteredTargetDayPrograms.length - 1];
+
+            const startOfDay = new Date(targetDate);
+            startOfDay.setHours(0, 0, 0, 0);
+
+            let currentStartTime = new Date(startOfDay);
+            if (lastProg) {
+                const [h, m] = lastProg.endTime.split(':').map(Number);
+                currentStartTime.setHours(h, m, 0, 0);
+            }
+
+            for (const v of programsToCopy) {
+                const durationMs = v.duration * 1000;
+                const endTime = new Date(currentStartTime.getTime() + durationMs);
+
+                await addProgram({
+                    channel_id: targetChannelId,
+                    title: v.title,
+                    description: v.description || '',
+                    video_id: v.videoId,
+                    duration: v.duration,
+                    creator: v.creator || '',
+                    start_time: currentStartTime.toISOString(),
+                    end_time: endTime.toISOString(),
+                    thumbnail: v.thumbnail || ''
+                });
+
+                currentStartTime = endTime;
+            }
+
+            await loadChannelPrograms(selectedChannelId);
+            setSelectedProgramIds([]);
+            setToast({ message: `${programsToCopy.length} program kopyalandı!`, type: 'success' });
+        } catch (err) {
+            console.error(err);
+            setToast({ message: 'Kopyalama hatası.', type: 'error' });
+        } finally {
+            setAdding(false);
+        }
+    };
+
+    const handleMoveSelected = async () => {
+        if (!targetChannelId || !targetDate || selectedProgramIds.length === 0) {
+            setToast({ message: 'Lütfen hedef kanal ve gün seçiniz.', type: 'error' });
+            return;
+        }
+        setAdding(true);
+        try {
+            const programsToMove = displayedPrograms.filter(p => selectedProgramIds.includes(p.id));
+            programsToMove.sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+            const targetDayPrograms = await getProgramsForChannel(targetChannelId);
+            const filteredTargetDayPrograms = targetDayPrograms.filter(p => p.date === targetDate);
+            filteredTargetDayPrograms.sort((a, b) => a.startTime.localeCompare(b.startTime));
+            const lastProg = filteredTargetDayPrograms[filteredTargetDayPrograms.length - 1];
+
+            const startOfDay = new Date(targetDate);
+            startOfDay.setHours(0, 0, 0, 0);
+
+            let currentStartTime = new Date(startOfDay);
+            if (lastProg) {
+                const [h, m] = lastProg.endTime.split(':').map(Number);
+                currentStartTime.setHours(h, m, 0, 0);
+            }
+
+            for (const v of programsToMove) {
+                const durationMs = v.duration * 1000;
+                const endTime = new Date(currentStartTime.getTime() + durationMs);
+
+                await addProgram({
+                    channel_id: targetChannelId,
+                    title: v.title,
+                    description: v.description || '',
+                    video_id: v.videoId,
+                    duration: v.duration,
+                    creator: v.creator || '',
+                    start_time: currentStartTime.toISOString(),
+                    end_time: endTime.toISOString(),
+                    thumbnail: v.thumbnail || ''
+                });
+
+                currentStartTime = endTime;
+            }
+
+            await deletePrograms(selectedProgramIds);
+            
+            await loadChannelPrograms(selectedChannelId);
+            setSelectedProgramIds([]);
+            setToast({ message: `${programsToMove.length} program taşındı!`, type: 'success' });
+        } catch (err) {
+            console.error(err);
+            setToast({ message: 'Taşıma hatası.', type: 'error' });
+        } finally {
+            setAdding(false);
+        }
+    };
+
+    const handleDownloadSchedule = () => {
+        if (selectedProgramIds.length === 0) return;
+        const selectedProgs = displayedPrograms.filter(p => selectedProgramIds.includes(p.id));
+        selectedProgs.sort((a, b) => a.startTime.localeCompare(b.startTime));
+        
+        const content = selectedProgs.map(p => `${p.title} - https://youtube.com/watch?v=${p.videoId}`).join('\n');
+        const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${channels.find(c => c.id === selectedChannelId)?.name}_akis_${selectedDate}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
     const handleReorder = (newItems: Program[]) => {
         // Optimistic update
         // We only updated the filtered list 'displayedPrograms' effectively, 
@@ -520,6 +651,80 @@ function AdminScheduleContent() {
 
             {/* Footer Navigation */}
             <FooterNav />
+
+            {/* Bulk Actions Bottom Bar */}
+            <div 
+                className={`fixed bottom-0 left-0 w-full h-[100px] bg-[#f97316] z-50 flex items-center justify-center gap-4 transition-transform duration-300 ${
+                    selectedProgramIds.length > 0 ? 'translate-y-0' : 'translate-y-full'
+                }`}
+            >
+                <button 
+                    onClick={() => setSelectedProgramIds(displayedPrograms.map(p => p.id))}
+                    className="bg-[#0000cb] text-[#f2911d] px-6 py-3 font-bold hover:opacity-80 transition-opacity cursor-pointer"
+                >
+                    Tümünü Seç
+                </button>
+
+                <select 
+                    value={targetChannelId}
+                    onChange={(e) => setTargetChannelId(e.target.value)}
+                    className="bg-[#2546ff] text-[#f2911d] px-6 py-3 font-bold outline-none cursor-pointer hover:opacity-80 transition-opacity appearance-none text-center"
+                    style={{ textAlignLast: 'center' }}
+                >
+                    <option value="">Kanal Seç ▼</option>
+                    {channels.map(c => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                </select>
+
+                <select 
+                    value={targetDate}
+                    onChange={(e) => setTargetDate(e.target.value)}
+                    className="bg-[#2546ff] text-[#f2911d] px-6 py-3 font-bold outline-none cursor-pointer hover:opacity-80 transition-opacity appearance-none text-center"
+                    style={{ textAlignLast: 'center' }}
+                >
+                    <option value="">Gün Seç ▼</option>
+                    {dateTabs.map(t => (
+                        <option key={t.date} value={t.date}>{t.label}</option>
+                    ))}
+                </select>
+
+                <button 
+                    onClick={handleMoveSelected}
+                    className="bg-[#2546ff] text-[#f2911d] px-6 py-3 font-bold hover:opacity-80 transition-opacity flex items-center gap-2 cursor-pointer"
+                >
+                    Taşı ({selectedProgramIds.length})
+                </button>
+
+                <button 
+                    onClick={handleCopySelected}
+                    className="bg-[#2546ff] text-[#f2911d] px-6 py-3 font-bold hover:opacity-80 transition-opacity flex items-center gap-2 cursor-pointer"
+                >
+                    Kopyala ({selectedProgramIds.length})
+                </button>
+
+                <button 
+                    onClick={handleDownloadSchedule}
+                    className="bg-[#ffce2e] text-[#000000] px-6 py-3 font-bold hover:opacity-80 transition-opacity cursor-pointer"
+                >
+                    Akışı indir
+                </button>
+
+                <button 
+                    onClick={handleBulkDelete}
+                    className="bg-[#ff6200] text-[#FFFFFF] px-6 py-3 font-bold hover:opacity-80 transition-opacity flex items-center gap-2 cursor-pointer"
+                >
+                    Seçilenleri sil ({selectedProgramIds.length})
+                </button>
+                
+                {/* Clear Selection */}
+                <button 
+                    onClick={() => setSelectedProgramIds([])}
+                    className="absolute top-2 right-4 text-white hover:text-black transition-colors"
+                >
+                    <X size={24} />
+                </button>
+            </div>
 
             {/* Modals */}
             <EditModal 
