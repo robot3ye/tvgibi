@@ -8,6 +8,7 @@ import { getChannels, getProgramsForDate } from '../../lib/api';
 import ChannelDisplayCard from './ChannelDisplayCard';
 import HomeSidebar from './HomeSidebar';
 import FooterNav from '../admin-v2/FooterNav';
+import { ReactLenis } from 'lenis/react';
 
 export default function HomeClient() {
     const containerRef = useRef<HTMLDivElement>(null);
@@ -138,62 +139,64 @@ export default function HomeClient() {
     }
 
     return (
-        <div ref={containerRef} className="min-h-screen bg-[#ff6610] font-mono flex flex-col">
-            <div className="w-full flex flex-col md:flex-row min-h-screen">
-                
-                {/* Left Content */}
-                <div className="flex-1 flex flex-col pl-[50px] pr-8 pb-12">
-                    <div className="w-full max-w-6xl mx-auto flex flex-col h-full">
-                        
-                        {/* Hero Section */}
-                        <div className="relative w-full mt-8 mb-2 border-4 border-black bg-black overflow-hidden" style={{ aspectRatio: '16/9' }}>
-                            <iframe 
-                                id="hero-iframe"
-                                src="/hero/index.html" 
-                                className="absolute inset-0 w-full h-full border-0 pointer-events-auto"
-                                title="tvgibi.tv hero"
-                                allow="autoplay; fullscreen"
-                            />
-                        </div>
-
-                        {/* Channels Grid */}
-                        <div className="channel-grid mt-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                            {channels.map(channel => {
-                                const prog = getProgramForChannel(channel.id, timeMode);
-                                const nextProg = getProgramForChannel(channel.id, 'NEXT');
-                                return (
-                                    <div key={channel.id} className="channel-card-wrapper">
-                                        <ChannelDisplayCard 
-                                            channel={channel}
-                                            program={prog}
-                                            nextProgram={nextProg}
-                                            currentTime={currentTime}
-                                        />
-                                    </div>
-                                );
-                            })}
-                        </div>
-
-                        {/* Navigation Footer */}
-                        <div className="mt-24">
-                            <FooterNav />
-                        </div>
-                        
-                        {/* Final Footer Pill */}
-                        <div className="flex justify-center mt-8 pb-8">
-                            <div className="bg-[#00FF00] text-black border-2 border-black px-6 py-1 rounded-full text-sm font-bold">
-                                ©2026 tvgibi
+        <ReactLenis root>
+            <div ref={containerRef} className="min-h-screen bg-[#ff6610] font-mono flex flex-col">
+                <div className="w-full flex flex-col md:flex-row min-h-screen">
+                    
+                    {/* Left Content */}
+                    <div className="flex-1 flex flex-col pl-[50px] pr-8 pb-12">
+                        <div className="w-full max-w-6xl mx-auto flex flex-col h-full">
+                            
+                            {/* Hero Section */}
+                            <div className="relative w-full mt-8 mb-2 border-4 border-black bg-black overflow-hidden" style={{ aspectRatio: '16/9' }}>
+                                <iframe 
+                                    id="hero-iframe"
+                                    src="/hero/index.html" 
+                                    className="absolute inset-0 w-full h-full border-0 pointer-events-auto"
+                                    title="tvgibi.tv hero"
+                                    allow="autoplay; fullscreen"
+                                />
                             </div>
-                        </div>
 
+                            {/* Channels Grid */}
+                            <div className="channel-grid mt-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                                {channels.map(channel => {
+                                    const prog = getProgramForChannel(channel.id, timeMode);
+                                    const nextProg = getProgramForChannel(channel.id, 'NEXT');
+                                    return (
+                                        <div key={channel.id} className="channel-card-wrapper">
+                                            <ChannelDisplayCard 
+                                                channel={channel}
+                                                program={prog}
+                                                nextProgram={nextProg}
+                                                currentTime={currentTime}
+                                            />
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Navigation Footer */}
+                            <div className="mt-24">
+                                <FooterNav />
+                            </div>
+                            
+                            {/* Final Footer Pill */}
+                            <div className="flex justify-center mt-8 pb-8">
+                                <div className="bg-[#00FF00] text-black border-2 border-black px-6 py-1 rounded-full text-sm font-bold">
+                                    ©2026 tvgibi
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    {/* Right Sidebar */}
+                    <div className="w-full md:w-80 flex-shrink-0 bg-[#00FF00] border-l-4 border-black border-b-4 md:border-b-0 sticky top-0 h-screen overflow-hidden">
+                        <HomeSidebar channels={channels} />
                     </div>
                 </div>
-
-                {/* Right Sidebar */}
-                <div className="w-full md:w-80 flex-shrink-0 bg-[#00FF00] border-l-4 border-black border-b-4 md:border-b-0 sticky top-0 h-screen overflow-hidden">
-                    <HomeSidebar channels={channels} />
-                </div>
             </div>
-        </div>
+        </ReactLenis>
     );
 }
