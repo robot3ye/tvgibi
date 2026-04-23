@@ -112,7 +112,7 @@ export default function RemoteControl({
         }
     }, []);
 
-    if (remotePosition === undefined || !isScaleLoaded) return null;
+    if (!isScaleLoaded || !remotePosition) return null;
 
     return (
         <Draggable 

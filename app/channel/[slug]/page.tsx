@@ -69,36 +69,37 @@ export default function ChannelPage({ params }: PageProps) {
       const savedX = localStorage.getItem('remotePosX');
       const savedY = localStorage.getItem('remotePosY');
       
-      // Her durumda önce güvenli bir merkeze alalım ki ekran dışında kalmasın
-      let initialX = 50;
-      let initialY = 50;
-      
-      const clientWidth = document.documentElement.clientWidth || window.innerWidth;
-      const clientHeight = document.documentElement.clientHeight || window.innerHeight;
-      
-      // Kumandanın tahmini başlangıç boyutu (%80)
-      const remoteW = 340 * 0.8;
-      const remoteH = 570 * 0.8;
+      // Başlangıçta güvenli bir değer (0,0) verip ekranda görünmez yapıyoruz.
+      setRemotePosition({ x: 0, y: 0 });
 
-      if (savedX && savedY) {
-          // Eğer kaydedilmiş pozisyon ekranın çok dışındaysa (resize sonrası), onu tekrar ekran içine çek
-          const x = parseFloat(savedX);
-          const y = parseFloat(savedY);
+      // Tarayıcının DOM elementlerini tam olarak yerleştirdiğinden emin olmak için 
+      // requestAnimationFrame veya kısa bir setTimeout (örn: 250ms) kullanıyoruz.
+      // Bu sırada kumanda `opacity-0` olacak (aşağıdaki isPositionLoaded kontrolü ile)
+      setTimeout(() => {
+          const clientWidth = document.documentElement.clientWidth || window.innerWidth;
+          const clientHeight = document.documentElement.clientHeight || window.innerHeight;
           
-          initialX = Math.min(Math.max(0, x), clientWidth - remoteW - 20);
-          initialY = Math.min(Math.max(0, y), clientHeight - remoteH - 20);
-      } else {
-          // Sayfanın en sağ alt kısmı
-          // Kumandayı container'a göre konumlandırıyoruz. 
-          // Çoğu tarayıcıda sağa dayalı olmak için genişlikten kumanda genişliğini çıkarıyoruz
-          initialX = Math.max(20, clientWidth - remoteW - 40); 
-          initialY = Math.max(20, clientHeight - remoteH - 40);
-      }
-      
-      setRemotePosition({ x: initialX, y: initialY });
-      
-      // Daha güvenli bir render için biraz daha bekleyelim
-      setTimeout(() => setIsPositionLoaded(true), 150);
+          // Kumandanın tahmini başlangıç boyutu (%80 scale)
+          const remoteW = 340 * 0.8;
+          const remoteH = 570 * 0.8;
+
+          let initialX = 50;
+          let initialY = 50;
+
+          if (savedX && savedY) {
+              const x = parseFloat(savedX);
+              const y = parseFloat(savedY);
+              initialX = Math.min(Math.max(0, x), clientWidth - remoteW - 20);
+              initialY = Math.min(Math.max(0, y), clientHeight - remoteH - 20);
+          } else {
+              // Sağ alt köşe
+              initialX = Math.max(20, clientWidth - remoteW - 40); 
+              initialY = Math.max(20, clientHeight - remoteH - 40);
+          }
+
+          setRemotePosition({ x: initialX, y: initialY });
+          setIsPositionLoaded(true);
+      }, 250); // Tarayıcı layout'unun oturması için 250ms bekliyoruz
   }, []);
 
   const handleVolumeChange = (newVolume: number | ((prev: number) => number)) => {
