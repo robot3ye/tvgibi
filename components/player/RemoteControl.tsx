@@ -79,8 +79,9 @@ export default function RemoteControl({
     onRandomChannel,
     onTurnOffTV
 }: RemoteControlProps) {
-    const [scale, setScale] = useState(1);
+    const [scale, setScale] = useState(0.8);
     const [isNumericPad, setIsNumericPad] = useState(false);
+    const [isScaleLoaded, setIsScaleLoaded] = useState(false);
 
     // Load saved scale from local storage
     useEffect(() => {
@@ -90,6 +91,7 @@ export default function RemoteControl({
         } else {
             setScale(0.8);
         }
+        setIsScaleLoaded(true);
     }, []);
 
     const handleScaleChange = (newScale: number) => {
@@ -110,7 +112,7 @@ export default function RemoteControl({
         }
     }, []);
 
-    if (remotePosition === undefined) return null;
+    if (remotePosition === undefined || !isScaleLoaded) return null;
 
     return (
         <Draggable 

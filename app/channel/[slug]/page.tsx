@@ -89,14 +89,16 @@ export default function ChannelPage({ params }: PageProps) {
           initialY = Math.min(Math.max(0, y), clientHeight - remoteH - 20);
       } else {
           // Sayfanın en sağ alt kısmı
+          // Kumandayı container'a göre konumlandırıyoruz. 
+          // Çoğu tarayıcıda sağa dayalı olmak için genişlikten kumanda genişliğini çıkarıyoruz
           initialX = Math.max(20, clientWidth - remoteW - 40); 
           initialY = Math.max(20, clientHeight - remoteH - 40);
       }
       
       setRemotePosition({ x: initialX, y: initialY });
       
-      // Wait a tiny bit for the DOM to settle before rendering Draggable
-      setTimeout(() => setIsPositionLoaded(true), 50);
+      // Daha güvenli bir render için biraz daha bekleyelim
+      setTimeout(() => setIsPositionLoaded(true), 150);
   }, []);
 
   const handleVolumeChange = (newVolume: number | ((prev: number) => number)) => {
