@@ -48,8 +48,9 @@ export default function ChannelPage({ params }: PageProps) {
   const subtitleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Track remote control position across channel changes
-  // Provide a default fallback position for SSR / initial render
-  const [remotePosition, setRemotePosition] = useState<{x: number, y: number} | undefined>(undefined);
+  // Başlangıçta null yerine güvenli bir default veriyoruz (SSR için)
+  const [remotePosition, setRemotePosition] = useState<{x: number, y: number}>({x: 50, y: 50});
+  const [isClient, setIsClient] = useState(false);
   
   const playerContainerRef = useRef<HTMLDivElement>(null);
   const draggableNodeRef = useRef<HTMLDivElement>(null);
@@ -58,6 +59,7 @@ export default function ChannelPage({ params }: PageProps) {
 
   // Initialize position and interaction on client side only to avoid hydration mismatch
   useEffect(() => {
+      setIsClient(true);
       // Sadece session storage'ı kontrol et, her reload'da izin isteme
       const hasPermission = sessionStorage.getItem('tv_started');
       setHasInteracted(!!hasPermission);
@@ -70,8 +72,6 @@ export default function ChannelPage({ params }: PageProps) {
           setRemotePosition({ x: parseFloat(savedX), y: parseFloat(savedY) });
       } else {
           // Sayfanın en sağ alt kısmı (340px genişlik, 570px yükseklik + margin)
-          // bounds="parent" ile çakışmaması için window yerine document.documentElement kullanıyoruz
-          // ve biraz daha geniş bir güvenlik payı bırakıyoruz.
           const clientWidth = document.documentElement.clientWidth || window.innerWidth;
           const clientHeight = document.documentElement.clientHeight || window.innerHeight;
           
@@ -429,53 +429,55 @@ export default function ChannelPage({ params }: PageProps) {
             </div>
         </div>
 
-        <RemoteControl 
-            remotePosition={remotePosition}
-            draggableNodeRef={draggableNodeRef}
-            showControls={showControls}
-            volume={volume}
-            setVolume={handleVolumeChange}
-            subtitleLang={subtitleLang}
-            onSubtitleToggle={handleSubtitleToggle}
-            handleRemoteDragStop={handleRemoteDragStop}
-            handleFullscreen={handleFullscreen}
-            copyLink={copyLink}
-            onPrevChannel={() => {
-                const currentIndex = allChannels.findIndex(c => c.id === channel.id);
-                const prevIndex = (currentIndex - 1 + allChannels.length) % allChannels.length;
-                triggerZap(allChannels[prevIndex].slug);
-            }}
-            onNextChannel={() => {
-                const currentIndex = allChannels.findIndex(c => c.id === channel.id);
-                const nextIndex = (currentIndex + 1) % allChannels.length;
-                triggerZap(allChannels[nextIndex].slug);
-            }}
-            onOpenChannelList={() => setShowChannelListModal(true)}
-            onGoHome={() => router.push('/')}
-            onOpenSchedule={() => router.push(`/schedule/${channel.slug}`)}
-            channelColor={channel.color_primary || '#00FF4F'}
-            onSelectChannelNumber={(num: number) => {
-                let targetIndex = num === 0 ? 9 : num - 1;
-                if (targetIndex >= 0 && targetIndex < allChannels.length) {
-                    triggerZap(allChannels[targetIndex].slug);
-                }
-            }}
-            onRandomChannel={() => {
-                const availableChannels = allChannels.filter(c => c.slug !== activeSlug);
-                if (availableChannels.length > 0) {
-                    const randomChannel = availableChannels[Math.floor(Math.random() * availableChannels.length)];
-                    triggerZap(randomChannel.slug);
-                }
-            }}
-            onTurnOffTV={() => {
-                sessionStorage.removeItem('tv_started');
-                setHasInteracted(false);
-                if (audioRef.current) {
-                    audioRef.current.pause();
-                    audioRef.current.currentTime = 0;
-                }
-            }}
-        />
+        {isClient && (
+            <RemoteControl 
+                remotePosition={remotePosition}
+                draggableNodeRef={draggableNodeRef}
+                showControls={showControls}
+                volume={volume}
+                setVolume={handleVolumeChange}
+                subtitleLang={subtitleLang}
+                onSubtitleToggle={handleSubtitleToggle}
+                handleRemoteDragStop={handleRemoteDragStop}
+                handleFullscreen={handleFullscreen}
+                copyLink={copyLink}
+                onPrevChannel={() => {
+                    const currentIndex = allChannels.findIndex(c => c.id === channel.id);
+                    const prevIndex = (currentIndex - 1 + allChannels.length) % allChannels.length;
+                    triggerZap(allChannels[prevIndex].slug);
+                }}
+                onNextChannel={() => {
+                    const currentIndex = allChannels.findIndex(c => c.id === channel.id);
+                    const nextIndex = (currentIndex + 1) % allChannels.length;
+                    triggerZap(allChannels[nextIndex].slug);
+                }}
+                onOpenChannelList={() => setShowChannelListModal(true)}
+                onGoHome={() => router.push('/')}
+                onOpenSchedule={() => router.push(`/schedule/${channel.slug}`)}
+                channelColor={channel.color_primary || '#00FF4F'}
+                onSelectChannelNumber={(num: number) => {
+                    let targetIndex = num === 0 ? 9 : num - 1;
+                    if (targetIndex >= 0 && targetIndex < allChannels.length) {
+                        triggerZap(allChannels[targetIndex].slug);
+                    }
+                }}
+                onRandomChannel={() => {
+                    const availableChannels = allChannels.filter(c => c.slug !== activeSlug);
+                    if (availableChannels.length > 0) {
+                        const randomChannel = availableChannels[Math.floor(Math.random() * availableChannels.length)];
+                        triggerZap(randomChannel.slug);
+                    }
+                }}
+                onTurnOffTV={() => {
+                    sessionStorage.removeItem('tv_started');
+                    setHasInteracted(false);
+                    if (audioRef.current) {
+                        audioRef.current.pause();
+                        audioRef.current.currentTime = 0;
+                    }
+                }}
+            />
+        )}
 
         {/* Channel List Modal */}
         {showChannelListModal && (
