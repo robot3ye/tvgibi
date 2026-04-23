@@ -70,10 +70,14 @@ export default function ChannelPage({ params }: PageProps) {
           setRemotePosition({ x: parseFloat(savedX), y: parseFloat(savedY) });
       } else {
           // Sayfanın en sağ alt kısmı (340px genişlik, 570px yükseklik + margin)
-          // useEffect içinde window nesnesi güvenli olduğu için hydration sorunu yaratmaz.
-          const startX = window.innerWidth - 340 - 20; 
-          const startY = window.innerHeight - 570 - 20;
-          setRemotePosition({ x: Math.max(0, startX), y: Math.max(0, startY) });
+          // bounds="parent" ile çakışmaması için window yerine document.documentElement kullanıyoruz
+          // ve biraz daha geniş bir güvenlik payı bırakıyoruz.
+          const clientWidth = document.documentElement.clientWidth || window.innerWidth;
+          const clientHeight = document.documentElement.clientHeight || window.innerHeight;
+          
+          const startX = clientWidth - 360; 
+          const startY = clientHeight - 600;
+          setRemotePosition({ x: Math.max(20, startX), y: Math.max(20, startY) });
       }
   }, []);
 
