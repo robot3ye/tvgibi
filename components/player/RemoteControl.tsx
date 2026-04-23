@@ -79,19 +79,15 @@ export default function RemoteControl({
     onRandomChannel,
     onTurnOffTV
 }: RemoteControlProps) {
-    const [scale, setScale] = useState(0.8);
+    const [scale, setScale] = useState(1);
     const [isNumericPad, setIsNumericPad] = useState(false);
-    const [isScaleLoaded, setIsScaleLoaded] = useState(false);
 
     // Load saved scale from local storage
     useEffect(() => {
         const savedScale = localStorage.getItem('remoteScale');
         if (savedScale) {
             setScale(parseFloat(savedScale));
-        } else {
-            setScale(0.8);
         }
-        setIsScaleLoaded(true);
     }, []);
 
     const handleScaleChange = (newScale: number) => {
@@ -112,7 +108,7 @@ export default function RemoteControl({
         }
     }, []);
 
-    if (!isScaleLoaded || !remotePosition) return null;
+    if (remotePosition === undefined) return null;
 
     return (
         <Draggable 
@@ -121,20 +117,20 @@ export default function RemoteControl({
             defaultPosition={remotePosition}
             onStop={handleRemoteDragStop}
             bounds="parent"
-            scale={1} // The external wrapper doesn't scale, only the visual content scales
+            scale={scale}
         >
             <div 
                 ref={draggableNodeRef} 
                 className={`absolute z-[9999] transition-opacity duration-500 ${showControls ? 'opacity-90 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
                 style={{ 
-                    width: `${340 * scale}px`,
-                    height: `${570 * scale}px`
+                    width: '340px',
+                    height: '570px'
                 }}
             >
-                {/* Remote Container: 340px wide, ~570px high, visually scaled but fits its parent wrapper */}
+                {/* Remote Container: 340px wide, ~570px high */}
                 <div 
-                    className="w-[340px] h-[570px] bg-white/40 backdrop-blur-md border-[6px] border-black flex flex-col origin-top-left"
-                    style={{ transform: `scale(${scale})` }}
+                    className="w-full h-full bg-white/40 backdrop-blur-md border-[6px] border-black flex flex-col"
+                    style={{ transform: `scale(${scale})`, transformOrigin: 'top left' }}
                 >
 
                     

@@ -48,10 +48,8 @@ export default function ChannelPage({ params }: PageProps) {
   const subtitleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Track remote control position across channel changes
-  // Başlangıçta null yerine güvenli bir default veriyoruz (SSR için)
-  const [remotePosition, setRemotePosition] = useState<{x: number, y: number}>({x: 50, y: 50});
+  const [remotePosition, setRemotePosition] = useState<{x: number, y: number} | undefined>(undefined);
   const [isClient, setIsClient] = useState(false);
-  const [isPositionLoaded, setIsPositionLoaded] = useState(false);
   
   const playerContainerRef = useRef<HTMLDivElement>(null);
   const draggableNodeRef = useRef<HTMLDivElement>(null);
@@ -69,37 +67,18 @@ export default function ChannelPage({ params }: PageProps) {
       const savedX = localStorage.getItem('remotePosX');
       const savedY = localStorage.getItem('remotePosY');
       
-      // Başlangıçta güvenli bir değer (0,0) verip ekranda görünmez yapıyoruz.
-      setRemotePosition({ x: 0, y: 0 });
-
-      // Tarayıcının DOM elementlerini tam olarak yerleştirdiğinden emin olmak için 
-      // requestAnimationFrame veya kısa bir setTimeout (örn: 250ms) kullanıyoruz.
-      // Bu sırada kumanda `opacity-0` olacak (aşağıdaki isPositionLoaded kontrolü ile)
-      setTimeout(() => {
+      if (savedX && savedY) {
+          setRemotePosition({ x: parseFloat(savedX), y: parseFloat(savedY) });
+      } else {
+          // Sayfanın en sağ alt kısmı yerine güvenli bir başlangıç noktası (ekran dışına taşmaması için)
+          // Default %100 geldiği için boyutunu 340x570 olarak varsayıyoruz
           const clientWidth = document.documentElement.clientWidth || window.innerWidth;
           const clientHeight = document.documentElement.clientHeight || window.innerHeight;
           
-          // Kumandanın tahmini başlangıç boyutu (%80 scale)
-          const remoteW = 340 * 0.8;
-          const remoteH = 570 * 0.8;
-
-          let initialX = 50;
-          let initialY = 50;
-
-          if (savedX && savedY) {
-              const x = parseFloat(savedX);
-              const y = parseFloat(savedY);
-              initialX = Math.min(Math.max(0, x), clientWidth - remoteW - 20);
-              initialY = Math.min(Math.max(0, y), clientHeight - remoteH - 20);
-          } else {
-              // Sağ alt köşe
-              initialX = Math.max(20, clientWidth - remoteW - 40); 
-              initialY = Math.max(20, clientHeight - remoteH - 40);
-          }
-
-          setRemotePosition({ x: initialX, y: initialY });
-          setIsPositionLoaded(true);
-      }, 250); // Tarayıcı layout'unun oturması için 250ms bekliyoruz
+          const startX = Math.max(20, clientWidth - 360);
+          const startY = Math.max(20, clientHeight - 600);
+          setRemotePosition({ x: startX, y: startY });
+      }
   }, []);
 
   const handleVolumeChange = (newVolume: number | ((prev: number) => number)) => {
@@ -450,7 +429,7 @@ export default function ChannelPage({ params }: PageProps) {
             </div>
         </div>
 
-        {isClient && isPositionLoaded && (
+        {isClient && (
             <RemoteControl 
                 remotePosition={remotePosition}
                 draggableNodeRef={draggableNodeRef}
