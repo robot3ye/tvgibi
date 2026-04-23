@@ -51,6 +51,7 @@ export default function ChannelPage({ params }: PageProps) {
   // Başlangıçta null yerine güvenli bir default veriyoruz (SSR için)
   const [remotePosition, setRemotePosition] = useState<{x: number, y: number}>({x: 50, y: 50});
   const [isClient, setIsClient] = useState(false);
+  const [isPositionLoaded, setIsPositionLoaded] = useState(false);
   
   const playerContainerRef = useRef<HTMLDivElement>(null);
   const draggableNodeRef = useRef<HTMLDivElement>(null);
@@ -79,6 +80,8 @@ export default function ChannelPage({ params }: PageProps) {
           const startY = clientHeight - 600;
           setRemotePosition({ x: Math.max(20, startX), y: Math.max(20, startY) });
       }
+      // Wait a tiny bit for the DOM to settle before rendering Draggable
+      setTimeout(() => setIsPositionLoaded(true), 50);
   }, []);
 
   const handleVolumeChange = (newVolume: number | ((prev: number) => number)) => {
@@ -429,7 +432,7 @@ export default function ChannelPage({ params }: PageProps) {
             </div>
         </div>
 
-        {isClient && (
+        {isClient && isPositionLoaded && (
             <RemoteControl 
                 remotePosition={remotePosition}
                 draggableNodeRef={draggableNodeRef}
