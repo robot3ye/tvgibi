@@ -70,14 +70,16 @@ export default function ChannelPage({ params }: PageProps) {
       if (savedX && savedY) {
           setRemotePosition({ x: parseFloat(savedX), y: parseFloat(savedY) });
       } else {
-          // Sayfanın en sağ alt kısmı yerine güvenli bir başlangıç noktası (ekran dışına taşmaması için)
-          // Default %100 geldiği için boyutunu 340x570 olarak varsayıyoruz
+          // Kumandayı her durumda "ekranın tam ortasında" başlatalım ki 
+          // gizli scroll, padding, div overflow vb. hiçbir şeye takılmasın.
           const clientWidth = document.documentElement.clientWidth || window.innerWidth;
           const clientHeight = document.documentElement.clientHeight || window.innerHeight;
           
-          const startX = Math.max(20, clientWidth - 360);
-          const startY = Math.max(20, clientHeight - 600);
-          setRemotePosition({ x: startX, y: startY });
+          // 340px genişlik ve 570px yüksekliğindeki kumandanın merkezi
+          const startX = (clientWidth / 2) - 170; 
+          const startY = (clientHeight / 2) - 285;
+          
+          setRemotePosition({ x: Math.max(0, startX), y: Math.max(0, startY) });
       }
   }, []);
 
@@ -374,7 +376,7 @@ export default function ChannelPage({ params }: PageProps) {
   }
 
   return (
-    <div ref={playerContainerRef} className="min-h-screen bg-black text-white flex flex-col font-mono relative overflow-hidden">
+    <div ref={playerContainerRef} className="fixed inset-0 w-screen h-screen bg-black text-white flex flex-col font-mono relative overflow-hidden">
       {/* Audio element for zapping noise */}
       <audio ref={audioRef} src="/tv-noise-fx.wav" preload="auto" />
 
@@ -386,7 +388,7 @@ export default function ChannelPage({ params }: PageProps) {
       />
 
       {/* Main Player Area */}
-      <div className="flex-grow relative bg-black flex items-center justify-center">
+      <div className="relative w-full h-full flex-grow bg-black flex items-center justify-center" style={{ padding: '0' }}>
         <ZappingNoise isZapping={isZapping} />
 
         {currentProgram ? (
