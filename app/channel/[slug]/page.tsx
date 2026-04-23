@@ -69,17 +69,28 @@ export default function ChannelPage({ params }: PageProps) {
       const savedX = localStorage.getItem('remotePosX');
       const savedY = localStorage.getItem('remotePosY');
       
+      // Her durumda önce güvenli bir merkeze alalım ki ekran dışında kalmasın
+      let initialX = 50;
+      let initialY = 50;
+      
+      const clientWidth = document.documentElement.clientWidth || window.innerWidth;
+      const clientHeight = document.documentElement.clientHeight || window.innerHeight;
+
       if (savedX && savedY) {
-          setRemotePosition({ x: parseFloat(savedX), y: parseFloat(savedY) });
+          // Eğer kaydedilmiş pozisyon ekranın çok dışındaysa (resize sonrası), onu tekrar ekran içine çek
+          const x = parseFloat(savedX);
+          const y = parseFloat(savedY);
+          
+          initialX = Math.min(Math.max(0, x), clientWidth - 360);
+          initialY = Math.min(Math.max(0, y), clientHeight - 600);
       } else {
           // Sayfanın en sağ alt kısmı (340px genişlik, 570px yükseklik + margin)
-          const clientWidth = document.documentElement.clientWidth || window.innerWidth;
-          const clientHeight = document.documentElement.clientHeight || window.innerHeight;
-          
-          const startX = clientWidth - 360; 
-          const startY = clientHeight - 600;
-          setRemotePosition({ x: Math.max(20, startX), y: Math.max(20, startY) });
+          initialX = Math.max(20, clientWidth - 360); 
+          initialY = Math.max(20, clientHeight - 600);
       }
+      
+      setRemotePosition({ x: initialX, y: initialY });
+      
       // Wait a tiny bit for the DOM to settle before rendering Draggable
       setTimeout(() => setIsPositionLoaded(true), 50);
   }, []);

@@ -116,7 +116,7 @@ export default function RemoteControl({
         <Draggable 
             handle=".handle" 
             nodeRef={draggableNodeRef}
-            defaultPosition={remotePosition}
+            position={remotePosition}
             onStop={handleRemoteDragStop}
             bounds="parent"
             scale={scale}
