@@ -75,18 +75,22 @@ export default function ChannelPage({ params }: PageProps) {
       
       const clientWidth = document.documentElement.clientWidth || window.innerWidth;
       const clientHeight = document.documentElement.clientHeight || window.innerHeight;
+      
+      // Kumandanın tahmini başlangıç boyutu (%80)
+      const remoteW = 340 * 0.8;
+      const remoteH = 570 * 0.8;
 
       if (savedX && savedY) {
           // Eğer kaydedilmiş pozisyon ekranın çok dışındaysa (resize sonrası), onu tekrar ekran içine çek
           const x = parseFloat(savedX);
           const y = parseFloat(savedY);
           
-          initialX = Math.min(Math.max(0, x), clientWidth - 360);
-          initialY = Math.min(Math.max(0, y), clientHeight - 600);
+          initialX = Math.min(Math.max(0, x), clientWidth - remoteW - 20);
+          initialY = Math.min(Math.max(0, y), clientHeight - remoteH - 20);
       } else {
-          // Sayfanın en sağ alt kısmı (340px genişlik, 570px yükseklik + margin)
-          initialX = Math.max(20, clientWidth - 360); 
-          initialY = Math.max(20, clientHeight - 600);
+          // Sayfanın en sağ alt kısmı
+          initialX = Math.max(20, clientWidth - remoteW - 40); 
+          initialY = Math.max(20, clientHeight - remoteH - 40);
       }
       
       setRemotePosition({ x: initialX, y: initialY });

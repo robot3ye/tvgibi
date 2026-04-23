@@ -116,23 +116,23 @@ export default function RemoteControl({
         <Draggable 
             handle=".handle" 
             nodeRef={draggableNodeRef}
-            position={remotePosition}
+            defaultPosition={remotePosition}
             onStop={handleRemoteDragStop}
             bounds="parent"
-            scale={scale}
+            scale={1} // The external wrapper doesn't scale, only the visual content scales
         >
             <div 
                 ref={draggableNodeRef} 
                 className={`absolute z-[9999] transition-opacity duration-500 ${showControls ? 'opacity-90 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
                 style={{ 
-                    width: '340px',
-                    height: '570px'
+                    width: `${340 * scale}px`,
+                    height: `${570 * scale}px`
                 }}
             >
-                {/* Remote Container: 340px wide, ~570px high */}
+                {/* Remote Container: 340px wide, ~570px high, visually scaled but fits its parent wrapper */}
                 <div 
-                    className="w-full h-full bg-white/40 backdrop-blur-md border-[6px] border-black flex flex-col"
-                    style={{ transform: `scale(${scale})`, transformOrigin: 'top left' }}
+                    className="w-[340px] h-[570px] bg-white/40 backdrop-blur-md border-[6px] border-black flex flex-col origin-top-left"
+                    style={{ transform: `scale(${scale})` }}
                 >
 
                     
