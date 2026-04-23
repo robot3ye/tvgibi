@@ -58,44 +58,23 @@ export default function ChannelPage({ params }: PageProps) {
 
   // Initialize position and interaction on client side only to avoid hydration mismatch
   useEffect(() => {
-      // In Next.js App Router, client-side navigation doesn't always trigger standard browser navigation events
-      // the same way a hard reload does. Also document.referrer might not be reliable across local navigations.
-      
-      // Let's use a simpler approach:
-      // If we have 'tv_started' in sessionStorage, it means the user has ALREADY clicked the "TV'Yİ AÇ" button 
-      // or navigated from the home page (we'll set it there too).
-      // However, if they HARD REFRESH on this page, the browser loses the "user gesture" context required for YouTube autoplay.
-      // So we MUST show the modal on a hard refresh, even if 'tv_started' is in sessionStorage.
-      
-      const isReload = (window.performance.navigation && window.performance.navigation.type === 1) ||
-                       (window.performance.getEntriesByType && window.performance.getEntriesByType("navigation").map((nav: any) => nav.type).includes("reload"));
-      
-      // If it's a hard reload, ALWAYS require interaction again.
-      if (isReload) {
-          setHasInteracted(false);
-          sessionStorage.removeItem('tv_started');
-      } else {
-          // If it's NOT a reload, check if we already have permission (from home page or previous click)
-          const hasPermission = sessionStorage.getItem('tv_started');
-          if (hasPermission) {
-              setHasInteracted(true);
-          } else {
-              setHasInteracted(false);
-          }
-      }
+      // Sadece session storage'ı kontrol et, her reload'da izin isteme
+      const hasPermission = sessionStorage.getItem('tv_started');
+      setHasInteracted(!!hasPermission);
 
-      // If no position saved in state/storage, start it at bottom-right 
-    // We'll let Draggable use its default bounds first, or we can set a specific starting x/y
-    const savedX = localStorage.getItem('remotePosX');
-    const savedY = localStorage.getItem('remotePosY');
-    if (savedX && savedY) {
-        setRemotePosition({ x: parseFloat(savedX), y: parseFloat(savedY) });
-    } else {
-        // Put it at bottom-right initially based on screen size
-        const startX = window.innerWidth - 320 - 64; 
-        const startY = window.innerHeight - 550 - 64;
-        setRemotePosition({ x: startX > 0 ? startX : 0, y: startY > 0 ? startY : 0 });
-    }
+      // Kumandanın başlangıç pozisyonu
+      const savedX = localStorage.getItem('remotePosX');
+      const savedY = localStorage.getItem('remotePosY');
+      
+      if (savedX && savedY) {
+          setRemotePosition({ x: parseFloat(savedX), y: parseFloat(savedY) });
+      } else {
+          // Sayfanın en sağ alt kısmı (340px genişlik, 570px yükseklik + margin)
+          // useEffect içinde window nesnesi güvenli olduğu için hydration sorunu yaratmaz.
+          const startX = window.innerWidth - 340 - 20; 
+          const startY = window.innerHeight - 570 - 20;
+          setRemotePosition({ x: Math.max(0, startX), y: Math.max(0, startY) });
+      }
   }, []);
 
   const handleVolumeChange = (newVolume: number | ((prev: number) => number)) => {
@@ -475,6 +454,21 @@ export default function ChannelPage({ params }: PageProps) {
                 let targetIndex = num === 0 ? 9 : num - 1;
                 if (targetIndex >= 0 && targetIndex < allChannels.length) {
                     triggerZap(allChannels[targetIndex].slug);
+                }
+            }}
+            onRandomChannel={() => {
+                const availableChannels = allChannels.filter(c => c.slug !== activeSlug);
+                if (availableChannels.length > 0) {
+                    const randomChannel = availableChannels[Math.floor(Math.random() * availableChannels.length)];
+                    triggerZap(randomChannel.slug);
+                }
+            }}
+            onTurnOffTV={() => {
+                sessionStorage.removeItem('tv_started');
+                setHasInteracted(false);
+                if (audioRef.current) {
+                    audioRef.current.pause();
+                    audioRef.current.currentTime = 0;
                 }
             }}
         />

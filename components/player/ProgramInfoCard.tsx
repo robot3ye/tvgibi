@@ -19,12 +19,12 @@ export default function ProgramInfoCard({
     if (!currentProgram) return null;
 
     return (
-        <div className={`absolute top-8 left-8 z-40 max-w-[30%] min-w-[350px] transition-opacity duration-500 mt-[25px] ml-[25px] hover:opacity-100 ${showControls ? 'opacity-30' : 'opacity-0'}`}>
+        <div className={`absolute top-8 left-8 z-40 max-w-[30%] min-w-[350px] transition-opacity duration-500 mt-[25px] ml-[25px] hover:opacity-100 ${showControls ? 'opacity-50' : 'opacity-0'}`}>
             <div 
                 className="p-6 text-black border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]"
                 style={{ backgroundColor: channel.color_primary || '#00FF4F' }}
             >
-                <h1 className="text-xl font-bold uppercase leading-tight mb-4">
+                <h1 className="text-2xl font-bold leading-tight mb-4">
                     {currentProgram.title}
                 </h1>
                 
@@ -58,7 +58,7 @@ export default function ProgramInfoCard({
                     <div className="border-t-2 border-black pt-4">
                         <span className="text-sm font-bold opacity-80">Sonraki Program:</span>
                         <br />
-                        <span className="font-bold uppercase">{nextProgram.title}</span>
+                        <span className="font-bold">{nextProgram.title}</span>
                     </div>
                 )}
             </div>

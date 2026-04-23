@@ -54,6 +54,8 @@ interface RemoteControlProps {
     onOpenSchedule: () => void;
     channelColor: string;
     onSelectChannelNumber: (num: number) => void;
+    onRandomChannel: () => void;
+    onTurnOffTV: () => void;
 }
 
 export default function RemoteControl({
@@ -73,7 +75,9 @@ export default function RemoteControl({
     onGoHome,
     onOpenSchedule,
     channelColor,
-    onSelectChannelNumber
+    onSelectChannelNumber,
+    onRandomChannel,
+    onTurnOffTV
 }: RemoteControlProps) {
     const [scale, setScale] = useState(1);
     const [isNumericPad, setIsNumericPad] = useState(false);
@@ -83,6 +87,8 @@ export default function RemoteControl({
         const savedScale = localStorage.getItem('remoteScale');
         if (savedScale) {
             setScale(parseFloat(savedScale));
+        } else {
+            setScale(0.8);
         }
     }, []);
 
@@ -114,16 +120,17 @@ export default function RemoteControl({
             onStop={handleRemoteDragStop}
             bounds="parent"
             scale={scale}
+            defaultPosition={{x: 50, y: 50}}
         >
             <div 
                 ref={draggableNodeRef} 
-                className={`absolute z-50 transition-opacity duration-500 ${showControls ? 'opacity-100' : 'opacity-0'}`}
+                className={`absolute z-[9999] transition-opacity duration-500 ${showControls ? 'opacity-90 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
                 style={{ 
-                    width: '320px',
-                    height: '550px'
+                    width: '340px',
+                    height: '570px'
                 }}
             >
-                {/* Remote Container: 320px wide, ~550px high */}
+                {/* Remote Container: 340px wide, ~570px high */}
                 <div 
                     className="w-full h-full bg-white/40 backdrop-blur-md border-[6px] border-black flex flex-col"
                     style={{ transform: `scale(${scale})`, transformOrigin: 'top left' }}
@@ -161,59 +168,86 @@ export default function RemoteControl({
                     {/* MAIN BUTTONS AREA */}
                     <div className="flex-grow p-3 flex flex-col gap-3">
                         {!isNumericPad ? (
-                            <div className="grid grid-cols-3 grid-rows-4 gap-3 h-full">
+                            <div className="grid grid-cols-3 grid-rows-5 gap-3 h-full">
+                                {/* Row 1 */}
                                 <RemoteButton 
-                                    label={<><span className="text-2xl">Kanal +</span></>} 
-                                    colorClass="bg-blue-700 text-white" colSpan={2} 
+                                    label={<><span className="text-3xl">Kanal +</span></>} 
+                                    colorClass="bg-[#1e3a8a] text-white" colSpan={2} 
                                     onClick={onNextChannel} 
                                 />
                                 <RemoteButton 
                                     label={<><span className="text-xl">Ses +</span></>} 
-                                    colorClass="bg-orange-500 text-white" 
+                                    colorClass="bg-[#f97316] text-white" 
                                     onClick={() => setVolume(v => Math.min(v + 10, 100))} 
                                 />
                                 
+                                {/* Row 2 */}
                                 <RemoteButton 
-                                    label={<><span className="text-2xl">Kanal -</span></>} 
-                                    colorClass="bg-blue-700 text-white" colSpan={2} 
+                                    label={<><span className="text-3xl">Kanal -</span></>} 
+                                    colorClass="bg-[#1e3a8a] text-white" colSpan={2} 
                                     onClick={onPrevChannel} 
                                 />
                                 <RemoteButton 
                                     label={<><span className="text-xl">Ses -</span></>} 
-                                    colorClass="bg-orange-500 text-white" 
+                                    colorClass="bg-[#f97316] text-white" 
                                     onClick={() => setVolume(v => Math.max(v - 10, 0))} 
                                 />
                                 
+                                {/* Row 3 */}
                                 <RemoteButton 
-                                    label="Rakamlı tuşlar_" 
-                                    colorClass="bg-blue-400 text-black text-sm" 
-                                    onClick={() => setIsNumericPad(true)} 
+                                    label={<>Yayın<br/>Akışı_</>} 
+                                    colorClass="bg-[#f2eaa5] text-[#000000] text-base" 
+                                    onClick={onOpenSchedule} 
                                 />
                                 <RemoteButton 
-                                    label="Kanal_ Index" 
-                                    colorClass="bg-blue-400 text-black text-sm" 
+                                    label={<>Kanal_<br/>Listesi</>} 
+                                    colorClass="bg-[#5ff0ff] text-[#000000] text-base" 
                                     onClick={onOpenChannelList} 
                                 />
                                 <RemoteButton 
-                                    label="Mute_" 
-                                    colorClass="bg-yellow-400 text-black text-sm" 
+                                    label="Sessiz_" 
+                                    colorClass="bg-[#ffae00] text-[#000000] text-base" 
                                     onClick={() => setVolume(v => v === 0 ? 50 : 0)} 
                                 />
                                 
+                                {/* Row 4 */}
                                 <RemoteButton 
-                                    label={<>Ana_<br/>sayfa</>} 
-                                    colorClass="bg-green-500 text-black text-sm" 
-                                    onClick={onGoHome} 
+                                    label={<i className="fa-solid fa-closed-captioning text-4xl"></i>} 
+                                    colorClass="bg-[#00fe01] text-[#000000]" 
+                                    onClick={onSubtitleToggle}
+                                    centered 
                                 />
                                 <RemoteButton 
-                                    label={<>Alt_<br/>yazı</>} 
-                                    colorClass={subtitleLang === 'tr' ? "bg-white text-black" : "bg-fuchsia-500 text-black text-sm"} 
-                                    onClick={onSubtitleToggle} 
+                                    label={<i className="fa-solid fa-shuffle text-4xl"></i>} 
+                                    colorClass="bg-[#fcfc03] text-[#000000]" 
+                                    onClick={onRandomChannel}
+                                    centered 
                                 />
                                 <RemoteButton 
-                                    label={<>Youtube<br/>Link_</>} 
-                                    colorClass="bg-red-500 text-black text-sm" 
-                                    onClick={copyLink} 
+                                    label={<i className="fa-brands fa-youtube text-4xl"></i>} 
+                                    colorClass="bg-[#000000] text-[#fd0000]" 
+                                    onClick={copyLink}
+                                    centered 
+                                />
+
+                                {/* Row 5 */}
+                                <RemoteButton 
+                                    label={<i className="fa-solid fa-house text-4xl"></i>} 
+                                    colorClass="bg-[#000000] text-[#00ff00]" 
+                                    onClick={onGoHome}
+                                    centered 
+                                />
+                                <RemoteButton 
+                                    label={<i className="fa-solid fa-skull text-4xl"></i>} 
+                                    colorClass="bg-[#fd0000] text-[#000000]" 
+                                    onClick={onTurnOffTV}
+                                    centered 
+                                />
+                                <RemoteButton 
+                                    label={<i className="fa-solid fa-expand text-4xl"></i>} 
+                                    colorClass="bg-[#ffffff] text-[#000000]" 
+                                    onClick={handleFullscreen}
+                                    centered 
                                 />
                             </div>
                         ) : (
@@ -238,30 +272,16 @@ export default function RemoteControl({
                     </div>
 
                     {/* 8 COLOR TEST PATTERN BAR */}
-                    <div ref={colorBarRef} className="h-4 w-full flex shrink-0 border-y-[6px] border-black items-end overflow-hidden">
-                        <div className="flex-1 bg-gray-400"></div>
-                        <div className="flex-1 bg-yellow-400"></div>
-                        <div className="flex-1 bg-cyan-400"></div>
-                        <div className="flex-1 bg-green-500"></div>
-                        <div className="flex-1 bg-fuchsia-500"></div>
-                        <div className="flex-1 bg-red-500"></div>
-                        <div className="flex-1 bg-blue-600"></div>
-                        <div className="flex-1 bg-black"></div>
+                    <div ref={colorBarRef} className="h-[40px] w-full flex shrink-0 border-y-[6px] border-black items-end overflow-hidden mt-auto">
+                        <div className="flex-1 bg-gray-400 h-full"></div>
+                        <div className="flex-1 bg-yellow-400 h-full"></div>
+                        <div className="flex-1 bg-cyan-400 h-full"></div>
+                        <div className="flex-1 bg-green-500 h-full"></div>
+                        <div className="flex-1 bg-fuchsia-500 h-full"></div>
+                        <div className="flex-1 bg-red-500 h-full"></div>
+                        <div className="flex-1 bg-blue-600 h-full"></div>
+                        <div className="flex-1 bg-black h-full"></div>
                     </div>
-
-                    {/* BOTTOM BAR */}
-                    <div 
-                        className="h-24 w-full p-3 flex flex-col justify-center gap-2 shrink-0"
-                        style={{ backgroundColor: channelColor }}
-                    >
-                        <button onClick={handleFullscreen} className="text-left font-mono font-bold text-black hover:underline hover:opacity-70 transition-opacity">
-                            _Tam ekrana moduna geç
-                        </button>
-                        <button onClick={onOpenSchedule} className="text-left font-mono font-bold text-black hover:underline hover:opacity-70 transition-opacity">
-                            _Yayın akışını incele
-                        </button>
-                    </div>
-
                 </div>
             </div>
         </Draggable>
