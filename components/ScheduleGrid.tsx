@@ -14,8 +14,8 @@ const START_HOUR = 0; // 00:00
 const PIXELS_PER_MINUTE = 4; // Slightly narrower for better overview
 
 const getMinutesFromTime = (timeStr: string) => {
-  const [hours, minutes] = timeStr.split(':').map(Number);
-  return hours * 60 + minutes;
+  const [hours, minutes, seconds] = timeStr.split(':').map(Number);
+  return hours * 60 + minutes + (seconds || 0) / 60;
 };
 
 const getPositionStyle = (startTime: string, endTime: string) => {

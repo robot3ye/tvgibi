@@ -40,11 +40,12 @@ const mapProgram = (dbProgram: any): Program => {
     const startDate = new Date(dbProgram.start_time);
     const endDate = new Date(dbProgram.end_time);
     
-    // Format HH:mm
+    // Format HH:mm:ss
     const formatTime = (date: Date) => {
         const h = date.getHours().toString().padStart(2, '0');
         const m = date.getMinutes().toString().padStart(2, '0');
-        return `${h}:${m}`;
+        const s = date.getSeconds().toString().padStart(2, '0');
+        return `${h}:${m}:${s}`;
     };
 
     // Format YYYY-MM-DD (Local Time)
@@ -361,9 +362,9 @@ export const reorderPrograms = async (programs: Program[], startTimeIso?: string
     } else {
         // Fallback: Use the first program's current start time as the anchor
         const p = programs[0];
-        const [h, m] = p.startTime.split(':').map(Number);
+        const [h, m, s] = p.startTime.split(':').map(Number);
         const d = new Date(p.date); 
-        d.setHours(h, m, 0, 0);
+        d.setHours(h, m, s || 0, 0);
         anchorDate = d;
     }
 

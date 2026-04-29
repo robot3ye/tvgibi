@@ -20,23 +20,22 @@ export default function ChannelDisplayCard({ channel, program, nextProgram, curr
     // Calculate remaining time
     let remainingText = '';
     if (program && currentTime) {
-        const [endH, endM] = program.endTime.split(':').map(Number);
-        const currH = currentTime.getHours();
-        const currM = currentTime.getMinutes();
-        const currS = currentTime.getSeconds();
+        const [startH, startM, startS] = program.startTime.split(':').map(Number);
+        const [endH, endM, endS] = program.endTime.split(':').map(Number);
         
-        let endTotalM = endH * 60 + endM;
-        let currTotalM = currH * 60 + currM;
+        const startTotal = startH * 3600 + startM * 60 + (startS || 0);
+        let endTotal = endH * 3600 + endM * 60 + (endS || 0);
+        const currentTotal = currentTime.getHours() * 3600 + currentTime.getMinutes() * 60 + currentTime.getSeconds();
         
         // Handle midnight crossing
-        if (endTotalM < currTotalM && endTotalM < 6 * 60) {
-            endTotalM += 24 * 60;
+        if (endTotal < currentTotal && endTotal < 6 * 3600) {
+            endTotal += 24 * 3600;
         }
 
-        const diffMinutes = endTotalM - currTotalM;
-        if (diffMinutes > 0) {
-            const remainingMins = diffMinutes - 1; // Since we are showing seconds, we subtract 1 minute
-            const remainingSecs = 60 - currS;
+        const diffSeconds = endTotal - currentTotal;
+        if (diffSeconds > 0) {
+            const remainingMins = Math.floor(diffSeconds / 60);
+            const remainingSecs = diffSeconds % 60;
             remainingText = `BU PROGRAMIN BİTMESİNE ${remainingMins} DK ${remainingSecs} SN KALDI..`;
         } else {
             remainingText = 'PROGRAM BİTMEK ÜZERE..';

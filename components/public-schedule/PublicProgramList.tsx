@@ -11,7 +11,7 @@ interface PublicProgramRowProps {
 
 function PublicProgramRow({ program, index, isLive, channelSlug }: PublicProgramRowProps) {
     // Determine Color Scheme based on time
-    const hour = parseInt(program.startTime.split(':')[0]);
+    const hour = parseInt(program.startTime.split(':')[0], 10);
     let rowClass = '';
     let textClass = '';
     let badgeClass = '';

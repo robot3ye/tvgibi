@@ -83,12 +83,12 @@ export default function PublicSchedulePage({ params }: PageProps) {
         
         if (prog.date !== todayStr) return false;
 
-        const [startH, startM] = prog.startTime.split(':').map(Number);
-        const [endH, endM] = prog.endTime.split(':').map(Number);
+        const [startH, startM, startS] = prog.startTime.split(':').map(Number);
+        const [endH, endM, endS] = prog.endTime.split(':').map(Number);
         
-        const startTime = startH * 60 + startM;
-        const endTime = endH * 60 + endM;
-        const currentTime = now.getHours() * 60 + now.getMinutes();
+        const startTime = startH * 3600 + startM * 60 + (startS || 0);
+        const endTime = endH * 3600 + endM * 60 + (endS || 0);
+        const currentTime = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
 
         return currentTime >= startTime && currentTime < endTime;
     };

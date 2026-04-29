@@ -179,23 +179,26 @@ export default function ChannelPage({ params }: PageProps) {
         }
 
         const now = new Date();
-        const [startH, startM] = currentProgram.startTime.split(':').map(Number);
-        const [endH, endM] = currentProgram.endTime.split(':').map(Number);
+        const [startH, startM, startS] = currentProgram.startTime.split(':').map(Number);
+        const [endH, endM, endS] = currentProgram.endTime.split(':').map(Number);
         
-        let startTotalMinutes = startH * 60 + startM;
-        let endTotalMinutes = endH * 60 + endM;
-        if (endTotalMinutes < startTotalMinutes) endTotalMinutes += 24 * 60; // Cross midnight
-
-        const currentTotalMinutes = now.getHours() * 60 + now.getMinutes();
-        let adjustedCurrentMinutes = currentTotalMinutes;
-        if (adjustedCurrentMinutes < startTotalMinutes && (startTotalMinutes - adjustedCurrentMinutes) > 12 * 60) {
-            adjustedCurrentMinutes += 24 * 60;
+        const startTotal = startH * 3600 + startM * 60 + (startS || 0);
+        let endTotal = endH * 3600 + endM * 60 + (endS || 0);
+        if (endTotal < startTotal) {
+            endTotal += 24 * 3600;
         }
 
-        const durationMinutes = endTotalMinutes - startTotalMinutes;
-        const elapsedMinutes = adjustedCurrentMinutes - startTotalMinutes;
-        const elapsedSeconds = elapsedMinutes * 60 + now.getSeconds();
-        const totalSeconds = durationMinutes * 60;
+        const currentH = now.getHours();
+        const currentM = now.getMinutes();
+        const currentS = now.getSeconds();
+        let currentTotal = currentH * 3600 + currentM * 60 + currentS;
+
+        if (currentTotal < startTotal && (startTotal - currentTotal) > 12 * 3600) {
+            currentTotal += 24 * 3600;
+        }
+
+        const elapsedSeconds = currentTotal - startTotal;
+        const totalSeconds = endTotal - startTotal;
         
         currentOffsetRef.current = Math.max(0, elapsedSeconds);
 

@@ -55,6 +55,8 @@ function AdminScheduleContent() {
     // Bulk Actions Bar State
     const [targetChannelId, setTargetChannelId] = useState<string>('');
     const [targetDate, setTargetDate] = useState<string>('');
+    const [isMoving, setIsMoving] = useState(false);
+    const [isCopying, setIsCopying] = useState(false);
 
     // --- Effects ---
 
@@ -136,12 +138,12 @@ function AdminScheduleContent() {
         
         if (prog.date !== todayStr) return false;
 
-        const [startH, startM] = prog.startTime.split(':').map(Number);
-        const [endH, endM] = prog.endTime.split(':').map(Number);
+        const [startH, startM, startS] = prog.startTime.split(':').map(Number);
+        const [endH, endM, endS] = prog.endTime.split(':').map(Number);
         
-        const startTime = startH * 60 + startM;
-        const endTime = endH * 60 + endM;
-        const currentTime = now.getHours() * 60 + now.getMinutes();
+        const startTime = startH * 3600 + startM * 60 + (startS || 0);
+        const endTime = endH * 3600 + endM * 60 + (endS || 0);
+        const currentTime = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
 
         return currentTime >= startTime && currentTime < endTime;
     };
@@ -204,8 +206,8 @@ function AdminScheduleContent() {
             let startTime = new Date(startOfDay);
 
             if (lastProg) {
-                const [h, m] = lastProg.endTime.split(':').map(Number);
-                startTime.setHours(h, m, 0, 0);
+                const [h, m, s] = lastProg.endTime.split(':').map(Number);
+                startTime.setHours(h, m, s || 0, 0);
             }
 
             if (startTime > endOfDay) {
@@ -218,10 +220,9 @@ function AdminScheduleContent() {
             const endTime = new Date(startTime.getTime() + durationMs);
 
             if (endTime > endOfDay) {
-                if (!confirm('Bu video gün sonunu (23:59) aşıyor. Yine de eklemek istiyor musunuz?')) {
-                    setAdding(false);
-                    return;
-                }
+                setToast({ message: 'Bu video gün sonunu (23:59) aşıyor! Lütfen daha kısa bir video ekleyin.', type: 'error' });
+                setAdding(false);
+                return;
             }
 
             await addProgram({
@@ -255,24 +256,61 @@ function AdminScheduleContent() {
         setAdding(true);
 
         try {
-            const startOfDay = new Date(selectedDate);
-            startOfDay.setHours(0, 0, 0, 0);
+            // Re-fetch all channel programs to have latest state, including other days
+            const allChannelPrograms = await getProgramsForChannel(selectedChannelId);
             
-            const dayPrograms = channelPrograms.filter(p => p.date === selectedDate);
-            dayPrograms.sort((a, b) => a.startTime.localeCompare(b.startTime));
-            const lastProg = dayPrograms[dayPrograms.length - 1];
-
-            let currentStartTime = new Date(startOfDay);
-            if (lastProg) {
-                const [h, m] = lastProg.endTime.split(':').map(Number);
-                currentStartTime.setHours(h, m, 0, 0);
-            }
+            let currentDayStr = selectedDate;
+            let currentStartTime: Date | null = null;
 
             for (const v of videos) {
-                const durationMs = v.duration * 1000;
-                const endTime = new Date(currentStartTime.getTime() + durationMs);
+                if (!currentStartTime) {
+                    const startOfDay = new Date(currentDayStr);
+                    startOfDay.setHours(0, 0, 0, 0);
+                    
+                    const dayPrograms = allChannelPrograms.filter(p => p.date === currentDayStr);
+                    dayPrograms.sort((a, b) => a.startTime.localeCompare(b.startTime));
+                    const lastProg = dayPrograms[dayPrograms.length - 1];
 
-                await addProgram({
+                    currentStartTime = new Date(startOfDay);
+                    if (lastProg) {
+                        const [h, m, s] = lastProg.endTime.split(':').map(Number);
+                        currentStartTime.setHours(h, m, s || 0, 0);
+                    }
+                }
+
+                const durationMs = v.duration * 1000;
+                let endTime: Date = new Date((currentStartTime as Date).getTime() + durationMs);
+
+                const endOfDay = new Date(currentDayStr);
+                endOfDay.setHours(23, 59, 59, 999);
+
+                if (endTime > endOfDay) {
+                    // Video exceeds 23:59:59. Push to the next day!
+                    const nextDay = new Date(currentDayStr);
+                    nextDay.setDate(nextDay.getDate() + 1);
+                    // Handle timezone offset to get correct YYYY-MM-DD
+                    const offset = nextDay.getTimezoneOffset();
+                    const localDate = new Date(nextDay.getTime() - (offset * 60 * 1000));
+                    currentDayStr = localDate.toISOString().split('T')[0];
+
+                    const nextStartOfDay = new Date(currentDayStr);
+                    nextStartOfDay.setHours(0, 0, 0, 0);
+
+                    const nextDayPrograms = allChannelPrograms.filter(p => p.date === currentDayStr);
+                    nextDayPrograms.sort((a, b) => a.startTime.localeCompare(b.startTime));
+                    const nextLastProg = nextDayPrograms[nextDayPrograms.length - 1];
+
+                    currentStartTime = new Date(nextStartOfDay);
+                    if (nextLastProg) {
+                        const [h, m, s] = nextLastProg.endTime.split(':').map(Number);
+                        currentStartTime.setHours(h, m, s || 0, 0);
+                    }
+
+                    // Recalculate endTime for the new day
+                    endTime = new Date((currentStartTime as Date).getTime() + durationMs);
+                }
+
+                const addedProgram = await addProgram({
                     channel_id: selectedChannelId,
                     title: v.title,
                     description: v.description,
@@ -283,6 +321,16 @@ function AdminScheduleContent() {
                     end_time: endTime.toISOString(),
                     thumbnail: v.thumbnail
                 });
+
+                if (addedProgram && addedProgram.length > 0) {
+                    // Update our local array so the next iteration knows about it
+                    allChannelPrograms.push({
+                        ...addedProgram[0],
+                        date: currentDayStr,
+                        startTime: currentStartTime.toISOString().split('T')[1].split('.')[0], // roughly HH:mm:ss
+                        endTime: endTime.toISOString().split('T')[1].split('.')[0],
+                    } as any);
+                }
 
                 currentStartTime = endTime;
             }
@@ -310,8 +358,8 @@ function AdminScheduleContent() {
             
             let startTime = new Date(selectedDate);
             if (lastProg) {
-                const [h, m] = lastProg.endTime.split(':').map(Number);
-                startTime.setHours(h, m, 0, 0);
+                const [h, m, s] = lastProg.endTime.split(':').map(Number);
+                startTime.setHours(h, m, s || 0, 0);
                 if (h >= 24) { 
                     setToast({ message: 'Gün zaten dolu!', type: 'error' });
                     setAdding(false);
@@ -360,7 +408,10 @@ function AdminScheduleContent() {
         if (!confirm('Silmek istediğinize emin misiniz?')) return;
         try {
             await deleteProgram(id);
-            loadChannelPrograms(selectedChannelId);
+            const updatedPrograms = channelPrograms.filter(p => p.id !== id);
+            setChannelPrograms(updatedPrograms);
+            const remainingDisplayed = updatedPrograms.filter(p => p.date === selectedDate);
+            handleReorder(remainingDisplayed);
             setToast({ message: 'Program silindi.', type: 'success' });
         } catch (err) {
             console.error(err);
@@ -372,7 +423,10 @@ function AdminScheduleContent() {
         if (!confirm(`${selectedProgramIds.length} programı silmek istiyor musunuz?`)) return;
         try {
             await deletePrograms(selectedProgramIds);
-            loadChannelPrograms(selectedChannelId);
+            const updatedPrograms = channelPrograms.filter(p => !selectedProgramIds.includes(p.id));
+            setChannelPrograms(updatedPrograms);
+            const remainingDisplayed = updatedPrograms.filter(p => p.date === selectedDate);
+            handleReorder(remainingDisplayed);
             setSelectedProgramIds([]);
             setToast({ message: 'Silindi.', type: 'success' });
         } catch (err) {
@@ -401,40 +455,80 @@ function AdminScheduleContent() {
             setToast({ message: 'Lütfen hedef kanal ve gün seçiniz.', type: 'error' });
             return;
         }
-        setAdding(true);
+        setIsCopying(true);
         try {
             const programsToCopy = displayedPrograms.filter(p => selectedProgramIds.includes(p.id));
             programsToCopy.sort((a, b) => a.startTime.localeCompare(b.startTime));
 
             const targetDayPrograms = await getProgramsForChannel(targetChannelId);
-            const filteredTargetDayPrograms = targetDayPrograms.filter(p => p.date === targetDate);
-            filteredTargetDayPrograms.sort((a, b) => a.startTime.localeCompare(b.startTime));
-            const lastProg = filteredTargetDayPrograms[filteredTargetDayPrograms.length - 1];
-
-            const startOfDay = new Date(targetDate);
-            startOfDay.setHours(0, 0, 0, 0);
-
-            let currentStartTime = new Date(startOfDay);
-            if (lastProg) {
-                const [h, m] = lastProg.endTime.split(':').map(Number);
-                currentStartTime.setHours(h, m, 0, 0);
-            }
+            let currentDayStr = targetDate;
+            let currentStartTime: Date | null = null;
 
             for (const v of programsToCopy) {
-                const durationMs = v.duration * 1000;
-                const endTime = new Date(currentStartTime.getTime() + durationMs);
+                if (!currentStartTime) {
+                    const startOfDay = new Date(currentDayStr);
+                    startOfDay.setHours(0, 0, 0, 0);
+                    
+                    const filteredTargetDayPrograms = targetDayPrograms.filter(p => p.date === currentDayStr);
+                    filteredTargetDayPrograms.sort((a, b) => a.startTime.localeCompare(b.startTime));
+                    const lastProg = filteredTargetDayPrograms[filteredTargetDayPrograms.length - 1];
 
-                await addProgram({
+                    currentStartTime = new Date(startOfDay);
+                    if (lastProg) {
+                        const [h, m, s] = lastProg.endTime.split(':').map(Number);
+                        currentStartTime.setHours(h, m, s || 0, 0);
+                    }
+                }
+
+                const durationMs = v.duration * 1000;
+                let endTime: Date = new Date((currentStartTime as Date).getTime() + durationMs);
+
+                const endOfDay = new Date(currentDayStr);
+                endOfDay.setHours(23, 59, 59, 999);
+
+                if (endTime > endOfDay) {
+                    const nextDay = new Date(currentDayStr);
+                    nextDay.setDate(nextDay.getDate() + 1);
+                    const offset = nextDay.getTimezoneOffset();
+                    const localDate = new Date(nextDay.getTime() - (offset * 60 * 1000));
+                    currentDayStr = localDate.toISOString().split('T')[0];
+
+                    const nextStartOfDay = new Date(currentDayStr);
+                    nextStartOfDay.setHours(0, 0, 0, 0);
+
+                    const nextDayPrograms = targetDayPrograms.filter(p => p.date === currentDayStr);
+                    nextDayPrograms.sort((a, b) => a.startTime.localeCompare(b.startTime));
+                    const nextLastProg = nextDayPrograms[nextDayPrograms.length - 1];
+
+                    currentStartTime = new Date(nextStartOfDay);
+                    if (nextLastProg) {
+                        const [h, m, s] = nextLastProg.endTime.split(':').map(Number);
+                        currentStartTime.setHours(h, m, s || 0, 0);
+                    }
+
+                    endTime = new Date((currentStartTime as Date).getTime() + durationMs);
+                }
+
+                const addedProgram = await addProgram({
                     channel_id: targetChannelId,
                     title: v.title,
                     description: v.description || '',
                     video_id: v.videoId,
                     duration: v.duration,
                     creator: v.creator || '',
-                    start_time: currentStartTime.toISOString(),
+                    start_time: (currentStartTime as Date).toISOString(),
                     end_time: endTime.toISOString(),
                     thumbnail: v.thumbnail || ''
                 });
+
+                if (addedProgram && addedProgram.length > 0) {
+                    targetDayPrograms.push({
+                        ...addedProgram[0],
+                        date: currentDayStr,
+                        startTime: (currentStartTime as Date).toISOString().split('T')[1].split('.')[0],
+                        endTime: endTime.toISOString().split('T')[1].split('.')[0],
+                    } as any);
+                }
 
                 currentStartTime = endTime;
             }
@@ -446,7 +540,7 @@ function AdminScheduleContent() {
             console.error(err);
             setToast({ message: 'Kopyalama hatası.', type: 'error' });
         } finally {
-            setAdding(false);
+            setIsCopying(false);
         }
     };
 
@@ -455,40 +549,80 @@ function AdminScheduleContent() {
             setToast({ message: 'Lütfen hedef kanal ve gün seçiniz.', type: 'error' });
             return;
         }
-        setAdding(true);
+        setIsMoving(true);
         try {
             const programsToMove = displayedPrograms.filter(p => selectedProgramIds.includes(p.id));
             programsToMove.sort((a, b) => a.startTime.localeCompare(b.startTime));
 
             const targetDayPrograms = await getProgramsForChannel(targetChannelId);
-            const filteredTargetDayPrograms = targetDayPrograms.filter(p => p.date === targetDate);
-            filteredTargetDayPrograms.sort((a, b) => a.startTime.localeCompare(b.startTime));
-            const lastProg = filteredTargetDayPrograms[filteredTargetDayPrograms.length - 1];
-
-            const startOfDay = new Date(targetDate);
-            startOfDay.setHours(0, 0, 0, 0);
-
-            let currentStartTime = new Date(startOfDay);
-            if (lastProg) {
-                const [h, m] = lastProg.endTime.split(':').map(Number);
-                currentStartTime.setHours(h, m, 0, 0);
-            }
+            let currentDayStr = targetDate;
+            let currentStartTime: Date | null = null;
 
             for (const v of programsToMove) {
-                const durationMs = v.duration * 1000;
-                const endTime = new Date(currentStartTime.getTime() + durationMs);
+                if (!currentStartTime) {
+                    const startOfDay = new Date(currentDayStr);
+                    startOfDay.setHours(0, 0, 0, 0);
+                    
+                    const filteredTargetDayPrograms = targetDayPrograms.filter(p => p.date === currentDayStr);
+                    filteredTargetDayPrograms.sort((a, b) => a.startTime.localeCompare(b.startTime));
+                    const lastProg = filteredTargetDayPrograms[filteredTargetDayPrograms.length - 1];
 
-                await addProgram({
+                    currentStartTime = new Date(startOfDay);
+                    if (lastProg) {
+                        const [h, m, s] = lastProg.endTime.split(':').map(Number);
+                        currentStartTime.setHours(h, m, s || 0, 0);
+                    }
+                }
+
+                const durationMs = v.duration * 1000;
+                let endTime: Date = new Date((currentStartTime as Date).getTime() + durationMs);
+
+                const endOfDay = new Date(currentDayStr);
+                endOfDay.setHours(23, 59, 59, 999);
+
+                if (endTime > endOfDay) {
+                    const nextDay = new Date(currentDayStr);
+                    nextDay.setDate(nextDay.getDate() + 1);
+                    const offset = nextDay.getTimezoneOffset();
+                    const localDate = new Date(nextDay.getTime() - (offset * 60 * 1000));
+                    currentDayStr = localDate.toISOString().split('T')[0];
+
+                    const nextStartOfDay = new Date(currentDayStr);
+                    nextStartOfDay.setHours(0, 0, 0, 0);
+
+                    const nextDayPrograms = targetDayPrograms.filter(p => p.date === currentDayStr);
+                    nextDayPrograms.sort((a, b) => a.startTime.localeCompare(b.startTime));
+                    const nextLastProg = nextDayPrograms[nextDayPrograms.length - 1];
+
+                    currentStartTime = new Date(nextStartOfDay);
+                    if (nextLastProg) {
+                        const [h, m, s] = nextLastProg.endTime.split(':').map(Number);
+                        currentStartTime.setHours(h, m, s || 0, 0);
+                    }
+
+                    endTime = new Date((currentStartTime as Date).getTime() + durationMs);
+                }
+
+                const addedProgram = await addProgram({
                     channel_id: targetChannelId,
                     title: v.title,
                     description: v.description || '',
                     video_id: v.videoId,
                     duration: v.duration,
                     creator: v.creator || '',
-                    start_time: currentStartTime.toISOString(),
+                    start_time: (currentStartTime as Date).toISOString(),
                     end_time: endTime.toISOString(),
                     thumbnail: v.thumbnail || ''
                 });
+
+                if (addedProgram && addedProgram.length > 0) {
+                    targetDayPrograms.push({
+                        ...addedProgram[0],
+                        date: currentDayStr,
+                        startTime: (currentStartTime as Date).toISOString().split('T')[1].split('.')[0],
+                        endTime: endTime.toISOString().split('T')[1].split('.')[0],
+                    } as any);
+                }
 
                 currentStartTime = endTime;
             }
@@ -502,7 +636,7 @@ function AdminScheduleContent() {
             console.error(err);
             setToast({ message: 'Taşıma hatası.', type: 'error' });
         } finally {
-            setAdding(false);
+            setIsMoving(false);
         }
     };
 
@@ -523,12 +657,8 @@ function AdminScheduleContent() {
         URL.revokeObjectURL(url);
     };
 
-    const handleReorder = (newItems: Program[]) => {
-        // Optimistic update
-        // We only updated the filtered list 'displayedPrograms' effectively, 
-        // but we need to update 'channelPrograms' which holds ALL days.
-        
-        // Daisy Chain Logic (Scoped to Day)
+    const handleReorder = async (newItems: Program[]) => {
+        // Optimistic update: anında state'i güncelleyerek UI gecikmesini (sekme/geri atma) engelliyoruz
         const now = new Date();
         const todayStr = getLocalDateString(now); // Use local date string
         const dayPrograms = newItems.filter(p => p.date === selectedDate);
@@ -537,15 +667,15 @@ function AdminScheduleContent() {
         
         const updatedDayPrograms = dayPrograms.map((prog) => {
             const isLive = isProgramLive(prog);
-            const [endH, endM] = prog.endTime.split(':').map(Number);
-            const endTimeVal = endH * 60 + endM;
-            const currentTimeVal = now.getHours() * 60 + now.getMinutes();
+            const [endH, endM, endS] = prog.endTime.split(':').map(Number);
+            const endTimeVal = endH * 3600 + endM * 60 + (endS || 0);
+            const currentTimeVal = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
             const isPast = (selectedDate === todayStr && currentTimeVal >= endTimeVal);
             
             if (isPast || isLive) {
-                const [h, m] = prog.endTime.split(':').map(Number);
+                const [h, m, s] = prog.endTime.split(':').map(Number);
                 const d = new Date(prog.date);
-                d.setHours(h, m, 0, 0);
+                d.setHours(h, m, s || 0, 0);
                 anchorTime = d;
                 return prog;
             }
@@ -560,7 +690,7 @@ function AdminScheduleContent() {
             const newStartTime = new Date(anchorTime);
             const newEndTime = new Date(anchorTime.getTime() + durationMs);
             
-            const format = (d: Date) => `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+            const format = (d: Date) => `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}`;
             
             const updatedProg = {
                 ...prog,
@@ -572,31 +702,33 @@ function AdminScheduleContent() {
             return updatedProg;
         });
 
+        // Optimistic state merge
+        const updatedChannelPrograms = channelPrograms.map(p => {
+            const updated = updatedDayPrograms.find(up => up.id === p.id);
+            return updated || p;
+        });
+        setChannelPrograms(updatedChannelPrograms);
+
         // Trigger API
         const changedItems = updatedDayPrograms.filter(p => {
              const isLive = isProgramLive(p);
-             const [endH, endM] = p.endTime.split(':').map(Number);
-             const endTimeVal = endH * 60 + endM;
-             const currentTimeVal = now.getHours() * 60 + now.getMinutes();
+             const [endH, endM, endS] = p.endTime.split(':').map(Number);
+             const endTimeVal = endH * 3600 + endM * 60 + (endS || 0);
+             const currentTimeVal = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
              const isPast = (selectedDate === todayStr && currentTimeVal >= endTimeVal);
              return !isLive && !isPast;
         });
         
         if (changedItems.length > 0) {
              const firstChanged = changedItems[0];
-             const [h, m] = firstChanged.startTime.split(':').map(Number);
+             const [h, m, s] = firstChanged.startTime.split(':').map(Number);
              const d = new Date(firstChanged.date);
-             d.setHours(h, m, 0, 0);
-             reorderPrograms(changedItems, d.toISOString());
+             d.setHours(h, m, s || 0, 0);
+             await reorderPrograms(changedItems, d.toISOString());
         }
 
-        // Merge back
-        const updatedChannelPrograms = channelPrograms.map(p => {
-            const updated = updatedDayPrograms.find(up => up.id === p.id);
-            return updated || p;
-        });
-        
-        setChannelPrograms(updatedChannelPrograms);
+        // We fetch the fresh channel programs from the server to ensure consistency.
+        await loadChannelPrograms(selectedChannelId);
     };
 
     return (
@@ -691,16 +823,18 @@ function AdminScheduleContent() {
 
                 <button 
                     onClick={handleMoveSelected}
-                    className="bg-[#2546ff] text-[#f2911d] px-6 py-3 font-bold hover:opacity-80 transition-opacity flex items-center gap-2 cursor-pointer"
+                    disabled={isMoving || isCopying}
+                    className={`bg-[#2546ff] text-[#f2911d] px-6 py-3 font-bold transition-opacity flex items-center gap-2 cursor-pointer ${isMoving ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-80'}`}
                 >
-                    Taşı ({selectedProgramIds.length})
+                    {isMoving ? 'Taşınıyor...' : `Taşı (${selectedProgramIds.length})`}
                 </button>
 
                 <button 
                     onClick={handleCopySelected}
-                    className="bg-[#2546ff] text-[#f2911d] px-6 py-3 font-bold hover:opacity-80 transition-opacity flex items-center gap-2 cursor-pointer"
+                    disabled={isMoving || isCopying}
+                    className={`bg-[#2546ff] text-[#f2911d] px-6 py-3 font-bold transition-opacity flex items-center gap-2 cursor-pointer ${isCopying ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-80'}`}
                 >
-                    Kopyala ({selectedProgramIds.length})
+                    {isCopying ? 'Kopyalanıyor...' : `Kopyala (${selectedProgramIds.length})`}
                 </button>
 
                 <button 

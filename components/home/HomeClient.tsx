@@ -68,27 +68,28 @@ export default function HomeClient() {
         // Time format is HH:mm. We need to compare carefully.
         const currentH = currentTime.getHours();
         const currentM = currentTime.getMinutes();
-        const currentTotal = currentH * 60 + currentM;
+        const currentS = currentTime.getSeconds();
+        const currentTotal = currentH * 3600 + currentM * 60 + currentS;
 
         let currentProgIndex = -1;
 
         for (let i = 0; i < channelPrograms.length; i++) {
             const p = channelPrograms[i];
-            const [sh, sm] = p.startTime.split(':').map(Number);
-            const startTotal = sh * 60 + sm;
+            const [sh, sm, ss] = p.startTime.split(':').map(Number);
+            const startTotal = sh * 3600 + sm * 60 + (ss || 0);
             
-            const [eh, em] = p.endTime.split(':').map(Number);
-            let endTotal = eh * 60 + em;
+            const [eh, em, es] = p.endTime.split(':').map(Number);
+            let endTotal = eh * 3600 + em * 60 + (es || 0);
             
             if (endTotal <= startTotal) {
-                endTotal += 24 * 60; // Handles crossing midnight
+                endTotal += 24 * 3600; // Handles crossing midnight
             }
 
             // Also if we are past midnight and checking a program that started before midnight
             let checkTotal = currentTotal;
-            if (currentTotal < startTotal && currentTotal < 6 * 60 && startTotal >= 18 * 60) {
-                // E.g. it is 01:00 (60) and program started at 23:00 (1380)
-                checkTotal += 24 * 60;
+            if (currentTotal < startTotal && currentTotal < 6 * 3600 && startTotal >= 18 * 3600) {
+                // E.g. it is 01:00 (3600) and program started at 23:00 (82800)
+                checkTotal += 24 * 3600;
             }
 
             if (checkTotal >= startTotal && checkTotal < endTotal) {
@@ -107,12 +108,12 @@ export default function HomeClient() {
             // If no current program is found, maybe find the next upcoming one today
             if (currentProgIndex === -1) {
                 const nextProg = channelPrograms.find(p => {
-                    const [sh, sm] = p.startTime.split(':').map(Number);
-                    const startTotal = sh * 60 + sm;
+                    const [sh, sm, ss] = p.startTime.split(':').map(Number);
+                    const startTotal = sh * 3600 + sm * 60 + (ss || 0);
                     // For finding next upcoming, if current is e.g. 23:00 and start is 01:00 (next day but same broadcast day)
                     // We should handle that. But simple startTotal > currentTotal is mostly fine.
                     let adjustedStart = startTotal;
-                    if (startTotal < 6 * 60 && currentTotal >= 18 * 60) adjustedStart += 24 * 60;
+                    if (startTotal < 6 * 3600 && currentTotal >= 18 * 3600) adjustedStart += 24 * 3600;
                     return adjustedStart > currentTotal;
                 });
                 return nextProg || null;
