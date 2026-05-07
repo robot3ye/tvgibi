@@ -91,7 +91,7 @@ export default function ChannelDisplayCard({ channel, program, nextProgram, curr
 
     return (
         <Link 
-            href={`/channel/${channel.slug}`} 
+            href={`/@${channel.slug}`} 
             className="block h-full group relative overflow-hidden"
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
@@ -198,7 +198,8 @@ export default function ChannelDisplayCard({ channel, program, nextProgram, curr
                 
                 {/* Flashing prompt at bottom */}
                 <div className="mt-auto pt-4 flex justify-between items-center border-t-2 border-[#00FF00]/30 text-[#00FF00] font-mono font-bold">
-                    <span className="text-xs opacity-70">tvgibi.tv/channel/{channel.slug}</span>
+                    <span className="text-xs opacity-70">tvgibi.tv/@{channel.slug}</span>
+                    <span className="animate-pulse tracking-widest text-lg">İZLE {'>'}</span>
                 </div>
             </div>
         </Link>

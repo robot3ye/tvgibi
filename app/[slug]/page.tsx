@@ -5,28 +5,33 @@ import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { ArrowLeft, Clock, Volume2, VolumeX, Maximize, Copy, List, ChevronLeft, ChevronRight, GripHorizontal } from 'lucide-react';
 import screenfull from 'screenfull';
-import { Program, Channel } from '../../../data/mockData';
-import { getChannels, getCurrentProgram } from '../../../lib/api';
+import { Program, Channel } from '../../data/mockData';
+import { getChannels, getCurrentProgram } from '../../lib/api';
 
-import TVOverlay from '../../../components/player/TVOverlay';
-import ProgramInfoCard from '../../../components/player/ProgramInfoCard';
-import RemoteControl from '../../../components/player/RemoteControl';
-import ZappingNoise from '../../../components/player/ZappingNoise';
+import TVOverlay from '../../components/player/TVOverlay';
+import ProgramInfoCard from '../../components/player/ProgramInfoCard';
+import RemoteControl from '../../components/player/RemoteControl';
+import ZappingNoise from '../../components/player/ZappingNoise';
 
 // Dynamic import with SSR disabled to prevent hydration errors
-const StablePlayer = dynamic(() => import('../../../components/StablePlayer'), { ssr: false });
+const StablePlayer = dynamic(() => import('../../components/StablePlayer'), { ssr: false });
 
 interface PageProps {
   params: Promise<{ slug: string }>;
 }
 
 export default function ChannelPage({ params }: PageProps) {
-  const { slug } = use(params);
+  const { slug: rawSlug } = use(params);
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   
+  // Parse the slug (handle @ prefix)
+  const decodedSlug = decodeURIComponent(rawSlug);
+  const isChannelLink = decodedSlug.startsWith('@');
+  const actualSlug = isChannelLink ? decodedSlug.slice(1) : decodedSlug;
+  
   // Track active slug in state to allow silent URL changes without unmounting
-  const [activeSlug, setActiveSlug] = useState(slug);
+  const [activeSlug, setActiveSlug] = useState(actualSlug);
   
   const [channel, setChannel] = useState<Channel | null>(null);
   const [currentProgram, setCurrentProgram] = useState<Program | null>(null);
@@ -124,7 +129,7 @@ export default function ChannelPage({ params }: PageProps) {
         const channels = await getChannels();
         if (isCancelled) return;
         setAllChannels(channels);
-        const found = channels.find(c => c.slug === activeSlug);
+        const found = channels.find((c: Channel) => c.slug === activeSlug);
         setChannel(found || null);
     };
     fetchChannel();
@@ -218,12 +223,19 @@ export default function ChannelPage({ params }: PageProps) {
   const triggerZap = (newSlug: string) => {
       if (newSlug === activeSlug || isZapping) return;
       
+      // OSD Volume'u kapat
+      setShowVolumeOSD(false);
+      if (volumeTimeoutRef.current) clearTimeout(volumeTimeoutRef.current);
+
       setIsZapping(true);
       
       // Force unmount the old player IMMEDIATELY by clearing states before we pushState
       setCurrentProgram(null);
       setNextProgram(null);
       lastProgramIdRef.current = null;
+      
+      // Random zap duration between 2000ms and 3000ms
+      const zapDuration = Math.floor(Math.random() * 1000) + 2000;
       
       // Play audio if available
       if (audioRef.current) {
@@ -237,7 +249,7 @@ export default function ChannelPage({ params }: PageProps) {
       // (destroying the old iframe) before we switch the active slug and trigger the new data fetch.
       setTimeout(() => {
           setActiveSlug(newSlug);
-          window.history.pushState(null, '', `/channel/${newSlug}`);
+          window.history.pushState(null, '', `/@${newSlug}`);
           
           // Fixed timeout for zap noise (2.5s gives enough time for API and YouTube to load behind it)
           setTimeout(() => {
@@ -256,7 +268,7 @@ export default function ChannelPage({ params }: PageProps) {
                   audioRef.current.pause();
                   audioRef.current.currentTime = 0;
               }
-          }, 2500);
+          }, zapDuration);
       }, 50); 
   };
 
@@ -338,10 +350,8 @@ export default function ChannelPage({ params }: PageProps) {
   };
 
   const copyLink = () => {
-      if (currentProgram) {
-          navigator.clipboard.writeText(`https://www.youtube.com/watch?v=${currentProgram.videoId}`);
-          alert('Link kopyalandı!'); // Quick feedback, can use toast later
-      }
+      navigator.clipboard.writeText(`${window.location.origin}/@${activeSlug}`);
+      alert('Link kopyalandı!'); // Quick feedback, can use toast later
   };
 
   if (!channel) {
@@ -458,7 +468,7 @@ export default function ChannelPage({ params }: PageProps) {
                 }}
                 onOpenChannelList={() => setShowChannelListModal(true)}
                 onGoHome={() => router.push('/')}
-                onOpenSchedule={() => router.push(`/schedule/${channel.slug}`)}
+                onOpenSchedule={() => router.push(`/schedule/${activeSlug}`)}
                 channelColor={channel.color_primary || '#00FF4F'}
                 onSelectChannelNumber={(num: number) => {
                     let targetIndex = num === 0 ? 9 : num - 1;

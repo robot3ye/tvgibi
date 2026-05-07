@@ -119,7 +119,7 @@ export default function HomeSidebar({ channels }: HomeSidebarProps) {
                     return (
                         <Link 
                             key={channel.id} 
-                            href={`/channel/${channel.id}`}
+                            href={`/@${channel.id}`}
                             className="sidebar-link block font-light cursor-pointer tracking-wider"
                         >
                             <ScrambleText text={text} delay={0.5 + (index * 0.1)} />

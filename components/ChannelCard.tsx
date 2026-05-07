@@ -9,7 +9,7 @@ interface ChannelCardProps {
 
 const ChannelCard: React.FC<ChannelCardProps> = ({ channel }) => {
   return (
-    <Link href={`/channel/${channel.slug}`}>
+    <Link href={`/@${channel.slug}`}>
       <div className="flex-shrink-0 w-32 h-32 md:w-40 md:h-40 relative group cursor-pointer transition-transform duration-300 hover:scale-105">
         <div 
           className="absolute inset-0 rounded-xl opacity-80 group-hover:opacity-100 transition-opacity"

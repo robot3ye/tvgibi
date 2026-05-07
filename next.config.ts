@@ -10,6 +10,15 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async redirects() {
+    return [
+      {
+        source: '/channel/:slug',
+        destination: '/@:slug',
+        permanent: true, // 301 redirect for SEO
+      },
+    ]
+  },
 };
 
 export default nextConfig;
