@@ -413,7 +413,7 @@ export default function ChannelPage({ params }: PageProps) {
             />
         ) : (
             <div className="text-center text-gray-500 z-10">
-                <p>Şu an yayın yok</p>
+                <p>Sinyal bekleniyor</p>
             </div>
         )}
 

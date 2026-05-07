@@ -270,34 +270,103 @@ export default function EmmyRoom() {
         if (!draft || !selectedChannelId) return;
         setSaving(true);
         try {
-            // Get the last program to know where to append
-            const { getLastProgram } = await import('../../../lib/api');
-            const lastProgram = await getLastProgram(selectedChannelId);
+            const { getProgramsForChannel } = await import('../../../lib/api');
+            const allChannelPrograms = await getProgramsForChannel(selectedChannelId);
             
-            let currentStartTime = lastProgram && lastProgram.end_time 
-                ? new Date(lastProgram.end_time) 
-                : new Date();
+            // Get today's local date string
+            const now = new Date();
+            const offsetMs = now.getTimezoneOffset() * 60 * 1000;
+            const localDate = new Date(now.getTime() - offsetMs);
+            let currentDayStr = localDate.toISOString().split('T')[0];
 
-            // Append each video sequentially
+            let currentStartTime: Date | null = null;
+
             for (const video of draft.videos) {
-                const durationMs = video.duration * 1000;
-                const endTime = new Date(currentStartTime.getTime() + durationMs);
+                if (!currentStartTime) {
+                    const startOfDay = new Date(currentDayStr);
+                    startOfDay.setHours(0, 0, 0, 0);
+                    
+                    const dayPrograms = allChannelPrograms.filter(p => p.date === currentDayStr);
+                    dayPrograms.sort((a, b) => a.startTime.localeCompare(b.startTime));
+                    const lastProg = dayPrograms[dayPrograms.length - 1];
+                    
+                    currentStartTime = new Date(startOfDay);
+                    if (lastProg) {
+                        const [h, m, s] = lastProg.endTime.split(':').map(Number);
+                        currentStartTime.setHours(h, m, s || 0, 0);
+                    }
+                }
 
-                await addProgram({
+                const durationMs = video.duration * 1000;
+                let endTime: Date = new Date((currentStartTime as Date).getTime() + durationMs);
+
+                // Cross-day check
+                const endOfDay = new Date(currentDayStr);
+                endOfDay.setHours(23, 59, 59, 999);
+
+                if (endTime > endOfDay) {
+                    const nextDay = new Date(currentDayStr);
+                    nextDay.setDate(nextDay.getDate() + 1);
+                    const offset = nextDay.getTimezoneOffset();
+                    const localNextDate = new Date(nextDay.getTime() - (offset * 60 * 1000));
+                    currentDayStr = localNextDate.toISOString().split('T')[0];
+
+                    const nextStartOfDay = new Date(currentDayStr);
+                    nextStartOfDay.setHours(0, 0, 0, 0);
+
+                    const nextDayPrograms = allChannelPrograms.filter(p => p.date === currentDayStr);
+                    nextDayPrograms.sort((a, b) => a.startTime.localeCompare(b.startTime));
+                    const nextLastProg = nextDayPrograms[nextDayPrograms.length - 1];
+
+                    currentStartTime = new Date(nextStartOfDay);
+                    if (nextLastProg) {
+                        const [h, m, s] = nextLastProg.endTime.split(':').map(Number);
+                        currentStartTime.setHours(h, m, s || 0, 0);
+                    }
+
+                    endTime = new Date((currentStartTime as Date).getTime() + durationMs);
+                }
+
+                const formatTime = (date: Date) => {
+                    const h = date.getHours().toString().padStart(2, '0');
+                    const m = date.getMinutes().toString().padStart(2, '0');
+                    const s = date.getSeconds().toString().padStart(2, '0');
+                    return `${h}:${m}:${s}`;
+                };
+
+                const newProgram = {
                     channel_id: selectedChannelId,
                     title: video.title,
                     description: draft.title, // Use draft title as description/context
-                    video_id: video.videoId,
+                    youtube_id: video.videoId,
                     duration: video.duration,
-                    start_time: currentStartTime.toISOString(),
-                    end_time: endTime.toISOString(),
-                    thumbnail: `https://i.ytimg.com/vi/${video.videoId}/hqdefault.jpg`,
-                    creator: video.creator || 'Emmy AI',
+                    start_time: formatTime(currentStartTime as Date),
+                    end_time: formatTime(endTime),
+                    date: currentDayStr,
+                    creator: video.creator || 'tvgibi.tv'
+                };
+
+                await addProgram(newProgram);
+                
+                // Add to local array for next iterations in the loop
+                allChannelPrograms.push({
+                    id: Math.random().toString(),
+                    channelId: selectedChannelId,
+                    title: video.title,
+                    description: draft.title,
+                    videoId: video.videoId,
+                    duration: video.duration,
+                    startTime: newProgram.start_time,
+                    endTime: newProgram.end_time,
+                    date: currentDayStr,
+                    creator: newProgram.creator,
+                    thumbnail: `https://img.youtube.com/vi/${video.videoId}/mqdefault.jpg`
                 });
 
                 currentStartTime = endTime;
             }
-            
+
+            setDraft(null);
             alert(`${draft.videos.length} video ${channels.find(c => c.id === selectedChannelId)?.name} kanalına başarıyla eklendi!`);
             
             // Clear draft after save
