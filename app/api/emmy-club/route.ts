@@ -1,7 +1,8 @@
 import { generateText } from 'ai';
 import { google } from '@ai-sdk/google';
-import { supabase } from '@/lib/supabase'; // Important: we need a server-side or service role client here ideally, but for now we can use the regular one. Let's create a server client if needed, but since we disabled RLS, the public client works fine!
+import { supabase } from '@/lib/supabase';
 
+export const runtime = 'edge';
 export const maxDuration = 60;
 
 export async function POST(req: Request) {
@@ -45,11 +46,18 @@ ${contextMessages.map(m => `${m.is_emmy ? 'Emmy' : m.nickname}: ${m.message}`).j
 ${nickname}: ${message}`;
 
     // 3. Generate response using Gemini
-    const { text } = await generateText({
-      model: google('gemini-2.5-flash'),
-      system: systemPrompt,
-      prompt: `${nickname}: ${message}`, // Using the system prompt for full context is enough, but we can also pass the prompt directly.
-    });
+    let text = '';
+    try {
+      const response = await generateText({
+        model: google('gemini-2.5-flash'),
+        system: systemPrompt,
+        prompt: `${nickname}: ${message}`, 
+      });
+      text = response.text;
+    } catch (aiError: any) {
+      console.error('AI Generation Error:', aiError);
+      text = "Sinyalimde bir bozulma var... Bağlantı kuramıyorum. Birazdan tekrar seslen bana.";
+    }
 
     // 4. Save Emmy's response to Supabase
     const { error: insertError } = await supabase
