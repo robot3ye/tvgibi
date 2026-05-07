@@ -1,15 +1,100 @@
 'use client';
 
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { useGSAP } from '@gsap/react';
 import gsap from 'gsap';
 import { Channel } from '../../data/mockData';
 import Link from 'next/link';
-import Grainient from '../ui/Grainient';
 
 interface HomeSidebarProps {
     channels: Channel[];
 }
+
+const chars = '!<>-_\\\\/[]{}—=+*^?#________';
+
+const ScrambleText = ({ text, delay = 0 }: { text: string, delay?: number }) => {
+    const [displayText, setDisplayText] = useState('');
+    const [isHovered, setIsHovered] = useState(false);
+    const textRef = useRef<HTMLSpanElement>(null);
+
+    useEffect(() => {
+        let timeout: NodeJS.Timeout;
+        let frame: number;
+        let iteration = 0;
+        
+        const scramble = () => {
+            const length = text.length;
+            let result = '';
+            for (let i = 0; i < length; i++) {
+                if (i < iteration) {
+                    result += text[i];
+                } else {
+                    result += chars[Math.floor(Math.random() * chars.length)];
+                }
+            }
+            setDisplayText(result);
+            
+            if (iteration < length) {
+                iteration += 1 / 3; // speed of unscrambling
+                frame = requestAnimationFrame(scramble);
+            }
+        };
+
+        timeout = setTimeout(() => {
+            frame = requestAnimationFrame(scramble);
+        }, delay * 1000);
+
+        return () => {
+            clearTimeout(timeout);
+            cancelAnimationFrame(frame);
+        };
+    }, [text, delay]);
+
+    const handleMouseEnter = () => {
+        setIsHovered(true);
+        let frame: number;
+        let iteration = 0;
+        
+        const scramble = () => {
+            const length = text.length;
+            let result = '';
+            for (let i = 0; i < length; i++) {
+                if (i < iteration) {
+                    result += text[i];
+                } else {
+                    result += chars[Math.floor(Math.random() * chars.length)];
+                }
+            }
+            if (textRef.current) {
+                textRef.current.innerText = result;
+            }
+            
+            if (iteration < length) {
+                iteration += 1 / 2; // hover scramble speed
+                frame = requestAnimationFrame(scramble);
+            }
+        };
+        frame = requestAnimationFrame(scramble);
+    };
+
+    const handleMouseLeave = () => {
+        setIsHovered(false);
+        if (textRef.current) {
+            textRef.current.innerText = text;
+        }
+    };
+
+    return (
+        <span 
+            ref={textRef}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+            className={`transition-colors duration-200 ${isHovered ? 'text-[#00ffff] drop-shadow-[0_0_5px_rgba(0,255,255,0.8)]' : 'text-[#d3f800]'}`}
+        >
+            {displayText}
+        </span>
+    );
+};
 
 export default function HomeSidebar({ channels }: HomeSidebarProps) {
     const sidebarRef = useRef<HTMLDivElement>(null);
@@ -18,63 +103,26 @@ export default function HomeSidebar({ channels }: HomeSidebarProps) {
         if (channels.length > 0) {
             const tl = gsap.timeline();
             
-            tl.fromTo('.sidebar-header', 
-                { x: 50, opacity: 0 },
-                { x: 0, opacity: 1, duration: 0.5, ease: 'power2.out', delay: 0.8 }
-            )
-            .fromTo('.sidebar-link', 
-                { x: 30, opacity: 0 },
-                { x: 0, opacity: 1, duration: 0.4, stagger: 0.05, ease: 'back.out(1.2)' }, 
-                "-=0.2"
-            )
-            .fromTo('.sidebar-footer', 
+            tl.fromTo('.sidebar-footer', 
                 { y: 50, opacity: 0 },
-                { y: 0, opacity: 1, duration: 0.5, ease: 'power2.out' }, 
-                "-=0.2"
+                { y: 0, opacity: 1, duration: 0.5, ease: 'power2.out', delay: 1 } 
             );
         }
     }, { scope: sidebarRef, dependencies: [channels.length] });
 
     return (
         <div ref={sidebarRef} className="h-full flex flex-col font-mono text-[#364153] relative">
-            <Grainient 
-                color1="#00ff08" 
-                color2="#ff0000" 
-                color3="#0000ff" 
-                timeSpeed={0.1} 
-                colorBalance={0} 
-                warpStrength={3.55} 
-                warpFrequency={0} 
-                warpSpeed={0.6} 
-                warpAmplitude={50} 
-                blendAngle={-3} 
-                blendSoftness={0.3} 
-                rotationAmount={500} 
-                noiseScale={2} 
-                grainAmount={0.1} 
-                grainScale={2} 
-                grainAnimated={false} 
-                contrast={1.5} 
-                gamma={1} 
-                saturation={1.7} 
-                centerX={0.5} 
-                centerY={0.4} 
-                zoom={10} 
-                className="opacity-80"
-            />
-            <div className="sidebar-header bg-[#FF00FF] p-4 border-b-4 border-black relative z-10">
-                <h2 className="text-3xl font-bold lowercase tracking-tighter text-white">kanal-list:</h2>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-2 pb-24 text-lg relative z-10">
+            <div className="flex-1 overflow-y-auto p-8 space-y-4 pb-24 text-lg relative z-10 pt-12">
                 {channels.map((channel, index) => {
                     const number = String(index + 1).padStart(2, '0');
+                    const text = `[${number}] ${channel.name}`;
                     return (
                         <Link 
                             key={channel.id} 
                             href={`/channel/${channel.id}`}
-                            className="sidebar-link block hover:text-black hover:bg-[#FF00FF] px-2 py-1 -mx-2 transition-colors cursor-pointer font-bold"
+                            className="sidebar-link block font-light cursor-pointer tracking-wider"
                         >
-                            [{number}] {channel.name}
+                            <ScrambleText text={text} delay={0.5 + (index * 0.1)} />
                         </Link>
                     );
                 })}

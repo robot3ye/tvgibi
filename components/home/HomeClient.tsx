@@ -8,14 +8,17 @@ import { getChannels, getProgramsForDate } from '../../lib/api';
 import ChannelDisplayCard from './ChannelDisplayCard';
 import HomeSidebar from './HomeSidebar';
 import FooterNav from '../admin-v2/FooterNav';
+import Grainient from '../ui/Grainient';
 import { ReactLenis } from 'lenis/react';
 
 export default function HomeClient() {
     const containerRef = useRef<HTMLDivElement>(null);
+    const footerObserverRef = useRef<HTMLDivElement>(null);
     const [channels, setChannels] = useState<Channel[]>([]);
     const [programs, setPrograms] = useState<Program[]>([]);
     const timeMode = 'NOW'; // Fixed to NOW since toggle buttons were removed
     const [currentTime, setCurrentTime] = useState<Date | null>(null);
+    const [showFooter, setShowFooter] = useState(false);
 
     // GSAP Animations
     useGSAP(() => {
@@ -57,6 +60,28 @@ export default function HomeClient() {
         }, 60000);
         return () => clearInterval(interval);
     }, []);
+
+    // Footer Observer (Fade in on scroll to bottom)
+    useEffect(() => {
+        if (channels.length === 0) return; // Veriler yüklenene kadar footer'ı gösterme
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting) {
+                    setShowFooter(true);
+                } else {
+                    setShowFooter(false);
+                }
+            },
+            { threshold: 0.1 }
+        );
+
+        if (footerObserverRef.current) {
+            observer.observe(footerObserverRef.current);
+        }
+
+        return () => observer.disconnect();
+    }, [channels.length]);
 
     const getProgramForChannel = (channelId: string, mode: 'NOW' | 'NEXT') => {
         if (!currentTime) return null;
@@ -141,8 +166,37 @@ export default function HomeClient() {
 
     return (
         <ReactLenis root>
-            <div ref={containerRef} className="min-h-screen bg-[#ff6610] font-mono flex flex-col">
-                <div className="w-full flex flex-col md:flex-row min-h-screen">
+            <div ref={containerRef} className="min-h-screen bg-[#00FF00] font-mono flex flex-col relative">
+                {/* Background Grainient */}
+                <div className="fixed inset-0 z-0 pointer-events-none">
+                    <Grainient 
+                        color1="#00ff08" 
+                        color2="#ff0000" 
+                        color3="#0000ff" 
+                        timeSpeed={0.1} 
+                        colorBalance={0} 
+                        warpStrength={3.55} 
+                        warpFrequency={0} 
+                        warpSpeed={0.6} 
+                        warpAmplitude={50} 
+                        blendAngle={-3} 
+                        blendSoftness={0.3} 
+                        rotationAmount={500} 
+                        noiseScale={2} 
+                        grainAmount={0.1} 
+                        grainScale={2} 
+                        grainAnimated={false} 
+                        contrast={1.5} 
+                        gamma={1} 
+                        saturation={1.7} 
+                        centerX={0.5} 
+                        centerY={0.4} 
+                        zoom={10} 
+                        className="opacity-80"
+                    />
+                </div>
+
+                <div className="w-full flex flex-col md:flex-row min-h-screen relative z-10">
                     
                     {/* Left Content */}
                     <div className="flex-1 flex flex-col pl-[50px] pr-8 pb-12">
@@ -178,14 +232,19 @@ export default function HomeClient() {
                             </div>
 
                             {/* Navigation Footer */}
-                            <div className="mt-24">
+                            <div 
+                                ref={footerObserverRef}
+                                className={`mt-24 transition-all duration-700 ease-out transform ${
+                                    showFooter ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-20'
+                                }`}
+                            >
                                 <FooterNav />
-                            </div>
-                            
-                            {/* Final Footer Pill */}
-                            <div className="flex justify-center mt-8 pb-8">
-                                <div className="bg-[#00FF00] text-black border-2 border-black px-6 py-1 rounded-full text-sm font-bold">
-                                    ©2026 tvgibi
+                                
+                                {/* Final Footer Pill */}
+                                <div className="flex justify-center mt-8 pb-8">
+                                    <div className="bg-[#00FF00] text-black border-2 border-black px-6 py-1 rounded-full text-sm font-bold">
+                                        ©2026 tvgibi
+                                    </div>
                                 </div>
                             </div>
 
@@ -193,7 +252,7 @@ export default function HomeClient() {
                     </div>
 
                     {/* Right Sidebar */}
-                    <div className="w-full md:w-80 flex-shrink-0 bg-[#00FF00] border-l-4 border-black border-b-4 md:border-b-0 sticky top-0 h-screen overflow-hidden" data-lenis-prevent>
+                    <div className="w-full md:w-80 flex-shrink-0 bg-[#131313] border-l-4 border-black border-b-4 md:border-b-0 sticky top-0 h-screen overflow-hidden" data-lenis-prevent>
                         <HomeSidebar channels={channels} />
                     </div>
                 </div>
