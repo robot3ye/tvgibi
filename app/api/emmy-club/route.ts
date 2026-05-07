@@ -48,6 +48,11 @@ ${nickname}: ${message}`;
     // 3. Generate response using Gemini
     let text = '';
     try {
+      // Check if API key exists in edge environment
+      if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
+        throw new Error('GOOGLE_GENERATIVE_AI_API_KEY is not defined in the environment.');
+      }
+
       const response = await generateText({
         model: google('gemini-2.5-flash'),
         system: systemPrompt,
@@ -55,8 +60,8 @@ ${nickname}: ${message}`;
       });
       text = response.text;
     } catch (aiError: any) {
-      console.error('AI Generation Error:', aiError);
-      text = "Sinyalimde bir bozulma var... Bağlantı kuramıyorum. Birazdan tekrar seslen bana.";
+      console.error('AI Generation Error:', aiError.message || aiError);
+      text = "Sinyalimde bir bozulma var... Bağlantı kuramıyorum. Birazdan tekrar seslen bana. (Hata: " + (aiError.message || "Bilinmiyor") + ")";
     }
 
     // 4. Save Emmy's response to Supabase
