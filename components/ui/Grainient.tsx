@@ -125,9 +125,9 @@ void main() {
 `;
 
 export default function Grainient({
-  color1 = '#00ff08',
-  color2 = '#84CC16',
-  color3 = '#F97316',
+color1 = '#00ff08',
+color2 = '#84CC16',
+color3 = '#F97316',
   timeSpeed = 1.6,
   colorBalance = 0,
   warpStrength = 3.55,

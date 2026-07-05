@@ -9,6 +9,7 @@ import ChannelDisplayCard from './ChannelDisplayCard';
 import HomeSidebar from './HomeSidebar';
 import FooterNav from '../admin-v2/FooterNav';
 import Grainient from '../ui/Grainient';
+import HeroPlayer from './HeroPlayer';
 import { ReactLenis } from 'lenis/react';
 
 export default function HomeClient() {
@@ -152,14 +153,6 @@ export default function HomeClient() {
         ? `${daysTr[currentTime.getDay()]} ${currentTime.getHours().toString().padStart(2, '0')}:${currentTime.getMinutes().toString().padStart(2, '0')}`
         : 'YÜKLENİYOR...';
 
-    // Send time to iframe
-    useEffect(() => {
-        const iframe = document.getElementById('hero-iframe') as HTMLIFrameElement;
-        if (iframe && iframe.contentWindow) {
-            iframe.contentWindow.postMessage({ type: 'UPDATE_TIME', payload: timeString }, '*');
-        }
-    }, [timeString]);
-
     if (!isMounted) {
         return <div className="min-h-screen bg-black"></div>;
     }
@@ -170,13 +163,13 @@ export default function HomeClient() {
                 {/* Background Grainient */}
                 <div className="fixed inset-0 z-0 pointer-events-none">
                     <Grainient 
-                        color1="#00ff08" 
-                        color2="#ff0000" 
-                        color3="#0000ff" 
-                        timeSpeed={0.1} 
-                        colorBalance={0} 
-                        warpStrength={3.55} 
-                        warpFrequency={0} 
+                        color1="#000" 
+                        color2="#fff" 
+                        color3="#000" 
+                        timeSpeed={0.4} 
+                        colorBalance={10} 
+                        warpStrength={1} 
+                        warpFrequency={5} 
                         warpSpeed={0.6} 
                         warpAmplitude={50} 
                         blendAngle={-3} 
@@ -188,11 +181,11 @@ export default function HomeClient() {
                         grainAnimated={false} 
                         contrast={1.5} 
                         gamma={1} 
-                        saturation={1.7} 
+                        saturation={1} 
                         centerX={0.5} 
                         centerY={0.4} 
                         zoom={10} 
-                        className="opacity-80"
+                        className="opacity-100"
                     />
                 </div>
 
@@ -203,15 +196,7 @@ export default function HomeClient() {
                         <div className="w-full max-w-6xl mx-auto flex flex-col h-full">
                             
                             {/* Hero Section */}
-                            <div className="relative w-full mt-8 mb-2 border-4 border-black bg-black overflow-hidden" style={{ aspectRatio: '16/9' }}>
-                                <iframe 
-                                    id="hero-iframe"
-                                    src="/hero/index.html" 
-                                    className="absolute inset-0 w-full h-full border-0 pointer-events-auto"
-                                    title="tvgibi.tv hero"
-                                    allow="autoplay; fullscreen"
-                                />
-                            </div>
+                            <HeroPlayer channels={channels} />
 
                             {/* Channels Grid */}
                             <div className="channel-grid mt-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
