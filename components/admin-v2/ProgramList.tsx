@@ -19,7 +19,7 @@ import {
     useSortable 
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Trash2, Edit2, RefreshCw, CheckSquare, Square, Youtube } from 'lucide-react';
+import { GripVertical, Trash2, Edit2, RefreshCw, CheckSquare, Square, Youtube, Copy } from 'lucide-react';
 import { Program } from '../../data/mockData';
 
 // --- Sortable Row Component ---
@@ -32,9 +32,10 @@ interface ProgramRowProps {
     onToggleSelect: (id: string) => void;
     isSelected: boolean;
     isLive?: boolean;
+    isArchive?: boolean;
 }
 
-function ProgramRow({ program, index, isOverlay, onDelete, onEdit, onToggleSelect, isSelected, isLive }: ProgramRowProps) {
+function ProgramRow({ program, index, isOverlay, onDelete, onEdit, onToggleSelect, isSelected, isLive, isArchive }: ProgramRowProps) {
     const {
         attributes,
         listeners,
@@ -42,7 +43,7 @@ function ProgramRow({ program, index, isOverlay, onDelete, onEdit, onToggleSelec
         transform,
         transition,
         isDragging
-    } = useSortable({ id: program.id });
+    } = useSortable({ id: program.id, disabled: isArchive });
 
     const style = {
         transform: CSS.Translate.toString(transform),
@@ -85,20 +86,38 @@ function ProgramRow({ program, index, isOverlay, onDelete, onEdit, onToggleSelec
         textClass = 'text-white';
     }
 
+    // Format duration to detailed string
+    const getDetailedDuration = (totalSeconds: number) => {
+        if (!totalSeconds) return '';
+        const h = Math.floor(totalSeconds / 3600);
+        const m = Math.floor((totalSeconds % 3600) / 60);
+        const s = totalSeconds % 60;
+        
+        const mmss = `${Math.floor(totalSeconds / 60)}:${String(s).padStart(2, '0')}`;
+        let detailed = '';
+        if (h > 0) detailed += `${h}s `;
+        if (m > 0 || h > 0) detailed += `${m}dk `;
+        detailed += `${s}sn`;
+        
+        return `${mmss} (${detailed.trim()})`;
+    };
+
     return (
         <div 
             ref={setNodeRef} 
             style={style} 
             className={`
                 flex items-center gap-4 p-2 mb-1 border-b-2 font-mono group select-none
-                ${rowClass}
+                ${rowClass} ${isArchive ? 'opacity-80' : ''}
             `}
         >
             {/* Drag Handle & Select */}
             <div className="flex items-center gap-2 pl-2">
-                <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing hover:opacity-70">
-                    <GripVertical size={20} className={textClass} />
-                </div>
+                {!isArchive && (
+                    <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing hover:opacity-70">
+                        <GripVertical size={20} className={textClass} />
+                    </div>
+                )}
                 <button onClick={() => onToggleSelect(program.id)}>
                     {isSelected ? (
                         <CheckSquare size={20} className={textClass} />
@@ -118,10 +137,10 @@ function ProgramRow({ program, index, isOverlay, onDelete, onEdit, onToggleSelec
             </div>
 
             {/* Thumbnail */}
-            <div className="w-24 h-14 bg-black border-2 border-black overflow-hidden flex-shrink-0 relative">
+            <div className="w-40 h-24 bg-black border-2 border-black overflow-hidden flex-shrink-0 relative">
                 <img src={program.thumbnail} alt="" className="w-full h-full object-cover" />
                 <div className="absolute bottom-0 right-0 bg-black text-white text-[10px] px-1 font-bold">
-                    {program.duration ? `${Math.floor(program.duration / 60)}:${String(program.duration % 60).padStart(2, '0')}` : ''}
+                    {getDetailedDuration(program.duration)}
                 </div>
             </div>
 
@@ -135,6 +154,7 @@ function ProgramRow({ program, index, isOverlay, onDelete, onEdit, onToggleSelec
             <div className={`flex-grow min-w-0 font-bold text-sm truncate ${textClass}`}>
                 {program.title}
                 {isLive && <span className="ml-2 px-1 bg-black text-white text-[10px] inline-block">ON AIR</span>}
+                {isArchive && <span className="ml-2 px-1 bg-gray-600 text-white text-[10px] inline-block">ARCHIVE</span>}
             </div>
 
             {/* Actions */}
@@ -146,14 +166,28 @@ function ProgramRow({ program, index, isOverlay, onDelete, onEdit, onToggleSelec
                     className={`p-1 hover:bg-[#ff0000] hover:text-white transition-colors rounded ${textClass}`}
                     title="Youtube'da Aç"
                 >
-                    <Youtube size={18} />
+                    <Youtube size={24} />
                 </a>
-                 <button onClick={() => onEdit(program)} className={`p-1 hover:bg-white/20 rounded ${textClass}`}>
-                    <Edit2 size={18} />
+                <button 
+                    onClick={() => {
+                        navigator.clipboard.writeText(`https://www.youtube.com/watch?v=${program.videoId}`);
+                        // Visual feedback can be added here if desired
+                    }} 
+                    className={`p-1 hover:bg-[#00ff00] hover:text-black transition-colors rounded ${textClass}`}
+                    title="Youtube Linkini Kopyala"
+                >
+                    <Copy size={24} />
                 </button>
-                <button onClick={() => onDelete(program.id)} className={`p-1 hover:bg-red-500 hover:text-white rounded ${textClass}`}>
-                    <Trash2 size={18} />
-                </button>
+                {!isArchive && (
+                    <>
+                        <button onClick={() => onEdit(program)} className={`p-1 hover:bg-white/20 rounded ${textClass}`}>
+                            <Edit2 size={24} />
+                        </button>
+                        <button onClick={() => onDelete(program.id)} className={`p-1 hover:bg-red-500 hover:text-white rounded ${textClass}`}>
+                            <Trash2 size={24} />
+                        </button>
+                    </>
+                )}
             </div>
         </div>
     );
@@ -171,10 +205,11 @@ interface ProgramListProps {
     onBulkDelete: () => void;
     onRefresh: () => void;
     liveProgramId?: string;
+    isArchive?: boolean;
 }
 
 export default function ProgramList({ 
-    programs, selectedDate, onReorder, onDelete, onEdit, selectedIds, onToggleSelect, onBulkDelete, onRefresh, liveProgramId
+    programs, selectedDate, onReorder, onDelete, onEdit, selectedIds, onToggleSelect, onBulkDelete, onRefresh, liveProgramId, isArchive
 }: ProgramListProps) {
     
     const [activeId, setActiveId] = React.useState<string | null>(null);
@@ -282,27 +317,31 @@ export default function ProgramList({
                                         onToggleSelect={onToggleSelect}
                                         isSelected={selectedIds.includes(program.id)}
                                         isLive={program.id === liveProgramId}
+                                        isArchive={isArchive}
                                     />
                                 </React.Fragment>
                             );
                         })}
                     </SortableContext>
                     
-                    <DragOverlay dropAnimation={{ sideEffects: defaultDropAnimationSideEffects({ styles: { active: { opacity: '0.5' } } }) }}>
-                        {activeProgram ? (
-                             <div className="opacity-90">
-                                <ProgramRow 
-                                    program={activeProgram} 
-                                    index={programs.findIndex(p => p.id === activeId)}
-                                    onDelete={() => {}} 
-                                    onEdit={() => {}} 
-                                    onToggleSelect={() => {}}
-                                    isSelected={false}
-                                    isOverlay
-                                />
-                             </div>
-                        ) : null}
-                    </DragOverlay>
+                    {!isArchive && (
+                        <DragOverlay dropAnimation={{ sideEffects: defaultDropAnimationSideEffects({ styles: { active: { opacity: '0.5' } } }) }}>
+                            {activeProgram ? (
+                                 <div className="opacity-90">
+                                    <ProgramRow 
+                                        program={activeProgram} 
+                                        index={programs.findIndex(p => p.id === activeId)}
+                                        onDelete={() => {}} 
+                                        onEdit={() => {}} 
+                                        onToggleSelect={() => {}}
+                                        isSelected={false}
+                                        isOverlay
+                                        isArchive={isArchive}
+                                    />
+                                 </div>
+                            ) : null}
+                        </DragOverlay>
+                    )}
                 </DndContext>
                 
                 {programs.length === 0 && (

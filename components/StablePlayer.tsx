@@ -126,10 +126,8 @@ const StablePlayer: React.FC<StablePlayerProps> = ({ url, initialStart, volume, 
   }
 
   return (
-        <div className="absolute inset-0 w-full h-full bg-black overflow-hidden pointer-events-none">
-            {/* The iframe wrapper needs pointer-events: none so that the video can't be paused by clicking,
-                BUT the JS API needs to be able to receive postMessages. 
-                pointer-events: none on the wrapper is fine, postMessage goes to contentWindow. */}
+        <div className="absolute inset-0 w-full h-full bg-black overflow-hidden pointer-events-auto">
+            {/* The iframe wrapper allows pointer events so user can interact with the video */}
             <iframe
                 ref={iframeRef}
         width="100%"
@@ -141,7 +139,7 @@ const StablePlayer: React.FC<StablePlayerProps> = ({ url, initialStart, volume, 
         allowFullScreen
         onLoad={handleIframeLoad}
         className="w-full h-full object-contain" // object-contain to fit video without crop
-        style={{ pointerEvents: 'none' }}
+        style={{ pointerEvents: 'auto' }}
       />
     </div>
   );

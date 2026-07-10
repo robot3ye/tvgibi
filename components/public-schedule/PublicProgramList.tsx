@@ -7,9 +7,10 @@ interface PublicProgramRowProps {
     index: number;
     isLive?: boolean;
     channelSlug: string;
+    onProgramClick?: () => void;
 }
 
-function PublicProgramRow({ program, index, isLive, channelSlug }: PublicProgramRowProps) {
+function PublicProgramRow({ program, index, isLive, channelSlug, onProgramClick }: PublicProgramRowProps) {
     // Determine Color Scheme based on time
     const hour = parseInt(program.startTime.split(':')[0], 10);
     let rowClass = '';
@@ -40,6 +41,7 @@ function PublicProgramRow({ program, index, isLive, channelSlug }: PublicProgram
 
     return (
         <div 
+            data-is-live={isLive ? 'true' : 'false'}
             className={`
                 flex items-center gap-4 p-2 mb-1 border-b-2 font-mono group select-none transition-transform hover:scale-[1.01]
                 ${rowClass}
@@ -55,7 +57,7 @@ function PublicProgramRow({ program, index, isLive, channelSlug }: PublicProgram
             </div>
 
             {/* Thumbnail - Links to the channel */}
-            <Link href={`/@${channelSlug}`} className="group/thumb relative w-24 h-14 bg-black border-2 border-black overflow-hidden shrink-0 block cursor-pointer">
+            <Link href={`/@${channelSlug}`} onClick={onProgramClick} className="group/thumb relative w-24 h-14 bg-black border-2 border-black overflow-hidden shrink-0 block cursor-pointer">
                 <img src={program.thumbnail} alt="" className="w-full h-full object-cover opacity-90 group-hover/thumb:opacity-100 transition-opacity" />
                 <div className="absolute bottom-0 right-0 bg-black text-white text-[10px] px-1 font-bold z-10">
                     {program.duration ? `${Math.floor(program.duration / 60)}:${String(program.duration % 60).padStart(2, '0')}` : ''}
@@ -82,6 +84,7 @@ function PublicProgramRow({ program, index, isLive, channelSlug }: PublicProgram
             <div className="pr-2 shrink-0">
                 <Link 
                     href={`/@${channelSlug}`}
+                    onClick={onProgramClick}
                     className={`px-3 py-1 text-xs font-bold uppercase border-2 transition-colors
                         ${isLive ? 'bg-black text-[#00FF00] border-black hover:bg-white hover:text-black' : 'bg-transparent border-current hover:bg-current hover:text-black opacity-0 group-hover:opacity-100'}
                     `}
@@ -102,10 +105,11 @@ interface PublicProgramListProps {
     programs: Program[];
     liveProgramId?: string;
     channelSlug: string;
+    onProgramClick?: () => void;
 }
 
 export default function PublicProgramList({ 
-    programs, liveProgramId, channelSlug
+    programs, liveProgramId, channelSlug, onProgramClick
 }: PublicProgramListProps) {
     if (programs.length === 0) {
         return (
@@ -124,6 +128,7 @@ export default function PublicProgramList({
                     index={index} 
                     isLive={program.id === liveProgramId}
                     channelSlug={channelSlug}
+                    onProgramClick={onProgramClick}
                 />
             ))}
         </div>

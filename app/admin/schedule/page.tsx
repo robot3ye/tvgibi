@@ -18,6 +18,7 @@ import EditModal from '../../../components/admin-v2/EditModal';
 import ChannelListModal from '../../../components/admin-v2/ChannelListModal';
 import BulkAddModal from '../../../components/admin-v2/BulkAddModal';
 import VideoDetailsModal from '../../../components/admin-v2/VideoDetailsModal';
+import ArchiveModal from '../../../components/admin-v2/ArchiveModal';
 
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
@@ -48,6 +49,7 @@ function AdminScheduleContent() {
     // Channel Management
     const [isChannelListModalOpen, setIsChannelListModalOpen] = useState(false);
     const [isBulkAddModalOpen, setIsBulkAddModalOpen] = useState(false);
+    const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
 
     // Toast
     const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
@@ -75,6 +77,9 @@ function AdminScheduleContent() {
         setSelectedDate(getLocalDateString()); 
     }, []);
 
+    // State for live program
+    const [realLiveProgram, setRealLiveProgram] = useState<Program | null>(null);
+
     // Sync state with URL parameter changes
     useEffect(() => {
         if (urlChannelId) {
@@ -82,12 +87,30 @@ function AdminScheduleContent() {
         }
     }, [urlChannelId]);
 
+    // Fetch the live program for the channel regardless of selected date
+    const fetchLiveProgram = async (channelId: string) => {
+        const todayStr = getLocalDateString();
+        const programs = await getProgramsForChannel(channelId, todayStr);
+        const live = programs.find(p => isProgramLive(p));
+        setRealLiveProgram(live || null);
+    };
+
     // 2. Load Programs
     useEffect(() => {
-        if (selectedChannelId) {
-            loadChannelPrograms(selectedChannelId);
+        if (selectedChannelId && selectedDate) {
+            loadChannelPrograms(selectedChannelId, selectedDate);
         }
-    }, [selectedChannelId]);
+        if (selectedChannelId) {
+            fetchLiveProgram(selectedChannelId);
+            
+            // Set up interval to periodically check/update live program
+            const interval = setInterval(() => {
+                fetchLiveProgram(selectedChannelId);
+            }, 60000); // check every minute
+            
+            return () => clearInterval(interval);
+        }
+    }, [selectedChannelId, selectedDate]);
 
     // 3. Toast Timer
     useEffect(() => {
@@ -107,10 +130,10 @@ function AdminScheduleContent() {
         return `${year}-${month}-${day}`;
     };
 
-    const loadChannelPrograms = async (channelId: string) => {
+    const loadChannelPrograms = async (channelId: string, dateStr: string) => {
         setSelectedProgramIds([]);
         try {
-            const programs = await getProgramsForChannel(channelId);
+            const programs = await getProgramsForChannel(channelId, dateStr);
             setChannelPrograms(programs);
         } catch (err) {
             console.error(err);
@@ -156,13 +179,18 @@ function AdminScheduleContent() {
         return filtered.sort((a, b) => a.startTime.localeCompare(b.startTime));
     }, [channelPrograms, selectedDate]);
 
-    const currentLiveProgram = useMemo(() => {
-        return channelPrograms.find(p => isProgramLive(p));
-    }, [channelPrograms]);
+    // Use the realLiveProgram for the ON_AIR section instead of checking within the selected date's programs
+    const currentLiveProgram = realLiveProgram;
 
     const totalDurationSeconds = useMemo(() => {
         return displayedPrograms.reduce((acc, curr) => acc + curr.duration, 0);
     }, [displayedPrograms]);
+
+    const isPastDate = useMemo(() => {
+        if (!selectedDate) return false;
+        const today = getLocalDateString();
+        return selectedDate < today;
+    }, [selectedDate]);
 
     // --- Handlers ---
 
@@ -239,7 +267,7 @@ function AdminScheduleContent() {
 
             setUrl('');
             setVideo(null);
-            await loadChannelPrograms(selectedChannelId);
+            await loadChannelPrograms(selectedChannelId, selectedDate);
             setToast({ message: 'Video eklendi!', type: 'success' });
             setIsVideoDetailsModalOpen(false);
 
@@ -335,7 +363,7 @@ function AdminScheduleContent() {
                 currentStartTime = endTime;
             }
 
-            await loadChannelPrograms(selectedChannelId);
+            await loadChannelPrograms(selectedChannelId, selectedDate);
             setToast({ message: `${videos.length} video toplu olarak eklendi!`, type: 'success' });
             setIsBulkAddModalOpen(false);
         } catch (err) {
@@ -393,7 +421,7 @@ function AdminScheduleContent() {
                 thumbnail: "https://img.youtube.com/vi/ILzo07ipH40/hqdefault.jpg"
             });
             
-            await loadChannelPrograms(selectedChannelId);
+            await loadChannelPrograms(selectedChannelId, selectedDate);
             setToast({ message: 'Dolgu eklendi.', type: 'success' });
             
         } catch (err) {
@@ -440,7 +468,7 @@ function AdminScheduleContent() {
         try {
             await updateProgram(id, updates);
             setEditingProgram(null);
-            loadChannelPrograms(selectedChannelId);
+            loadChannelPrograms(selectedChannelId, selectedDate);
             setToast({ message: 'Güncellendi.', type: 'success' });
         } catch (err) {
             console.error(err);
@@ -460,7 +488,7 @@ function AdminScheduleContent() {
             const programsToCopy = displayedPrograms.filter(p => selectedProgramIds.includes(p.id));
             programsToCopy.sort((a, b) => a.startTime.localeCompare(b.startTime));
 
-            const targetDayPrograms = await getProgramsForChannel(targetChannelId);
+            const targetDayPrograms = await getProgramsForChannel(targetChannelId, targetDate);
             let currentDayStr = targetDate;
             let currentStartTime: Date | null = null;
 
@@ -533,7 +561,7 @@ function AdminScheduleContent() {
                 currentStartTime = endTime;
             }
 
-            await loadChannelPrograms(selectedChannelId);
+            await loadChannelPrograms(selectedChannelId, selectedDate);
             setSelectedProgramIds([]);
             setToast({ message: `${programsToCopy.length} program kopyalandı!`, type: 'success' });
         } catch (err) {
@@ -629,7 +657,7 @@ function AdminScheduleContent() {
 
             await deletePrograms(selectedProgramIds);
             
-            await loadChannelPrograms(selectedChannelId);
+            await loadChannelPrograms(selectedChannelId, selectedDate);
             setSelectedProgramIds([]);
             setToast({ message: `${programsToMove.length} program taşındı!`, type: 'success' });
         } catch (err) {
@@ -728,7 +756,7 @@ function AdminScheduleContent() {
         }
 
         // We fetch the fresh channel programs from the server to ensure consistency.
-        await loadChannelPrograms(selectedChannelId);
+        await loadChannelPrograms(selectedChannelId, selectedDate);
     };
 
     return (
@@ -740,33 +768,42 @@ function AdminScheduleContent() {
                     selectedDate={selectedDate} 
                     onDateSelect={setSelectedDate} 
                     onMenuClick={() => setIsChannelListModalOpen(true)}
+                    onArchiveClick={() => setIsArchiveModalOpen(true)}
                     selectedChannelName={channels.find(c => c.id === selectedChannelId)?.name}
                 />
 
                 {/* Video Input */}
-                <VideoInputSection 
-                    url={url}
-                    setUrl={setUrl}
-                    onFetch={handleFetch}
-                    videoDetails={video}
-                    onAdd={handleAddProgram}
-                    onCancel={() => { setVideo(null); setUrl(''); setIsVideoDetailsModalOpen(false); }}
-                    onAddFiller={handleAddFiller}
-                    onBulkAddClick={() => setIsBulkAddModalOpen(true)}
-                    loading={loading}
-                    adding={adding}
-                />
+                {!isPastDate && (
+                    <VideoInputSection 
+                        url={url}
+                        setUrl={setUrl}
+                        onFetch={handleFetch}
+                        videoDetails={video}
+                        onAdd={handleAddProgram}
+                        onCancel={() => { setVideo(null); setUrl(''); setIsVideoDetailsModalOpen(false); }}
+                        onAddFiller={handleAddFiller}
+                        onBulkAddClick={() => setIsBulkAddModalOpen(true)}
+                        loading={loading}
+                        adding={adding}
+                    />
+                )}
             </div>
 
             {/* Day Stats (Hero) */}
             <DayStats 
                 selectedDate={selectedDate} 
                 totalDurationSeconds={totalDurationSeconds}
-                currentProgram={currentLiveProgram}
+                currentProgram={currentLiveProgram || undefined}
+                channelSlug={selectedChannelId}
             />
 
             {/* Main Content Area */}
             <div className="p-4 md:p-8">
+                {isPastDate && (
+                    <div className="bg-[#FFFF00] text-black font-bold p-3 mb-4 text-center border-4 border-black uppercase text-sm md:text-base">
+                        ⚠️ Arşiv Görünümündesiniz. Ekleme, silme ve taşıma işlemleri yapılamaz. Yalnızca başka bir güne kopyalama yapabilirsiniz.
+                    </div>
+                )}
                 <ProgramList 
                     programs={displayedPrograms}
                     selectedDate={selectedDate}
@@ -774,10 +811,11 @@ function AdminScheduleContent() {
                     onDelete={handleDeleteProgram}
                     onEdit={setEditingProgram}
                     selectedIds={selectedProgramIds}
-            onToggleSelect={(id) => setSelectedProgramIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])}
+                    onToggleSelect={(id) => setSelectedProgramIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])}
                     onBulkDelete={handleBulkDelete}
-                    onRefresh={() => loadChannelPrograms(selectedChannelId)}
+                    onRefresh={() => loadChannelPrograms(selectedChannelId, selectedDate)}
                     liveProgramId={currentLiveProgram?.id}
+                    isArchive={isPastDate}
                 />
             </div>
 
@@ -821,13 +859,15 @@ function AdminScheduleContent() {
                     ))}
                 </select>
 
-                <button 
-                    onClick={handleMoveSelected}
-                    disabled={isMoving || isCopying}
-                    className={`bg-[#2546ff] text-[#f2911d] px-6 py-3 font-bold transition-opacity flex items-center gap-2 cursor-pointer ${isMoving ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-80'}`}
-                >
-                    {isMoving ? 'Taşınıyor...' : `Taşı (${selectedProgramIds.length})`}
-                </button>
+                {!isPastDate && (
+                    <button 
+                        onClick={handleMoveSelected}
+                        disabled={isMoving || isCopying}
+                        className={`bg-[#2546ff] text-[#f2911d] px-6 py-3 font-bold transition-opacity flex items-center gap-2 cursor-pointer ${isMoving ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-80'}`}
+                    >
+                        {isMoving ? 'Taşınıyor...' : `Taşı (${selectedProgramIds.length})`}
+                    </button>
+                )}
 
                 <button 
                     onClick={handleCopySelected}
@@ -844,12 +884,14 @@ function AdminScheduleContent() {
                     Akışı indir
                 </button>
 
-                <button 
-                    onClick={handleBulkDelete}
-                    className="bg-[#ff6200] text-[#FFFFFF] px-6 py-3 font-bold hover:opacity-80 transition-opacity flex items-center gap-2 cursor-pointer"
-                >
-                    Seçilenleri sil ({selectedProgramIds.length})
-                </button>
+                {!isPastDate && (
+                    <button 
+                        onClick={handleBulkDelete}
+                        className="bg-[#ff6200] text-[#FFFFFF] px-6 py-3 font-bold hover:opacity-80 transition-opacity flex items-center gap-2 cursor-pointer"
+                    >
+                        Seçilenleri sil ({selectedProgramIds.length})
+                    </button>
+                )}
                 
                 {/* Clear Selection */}
                 <button 
@@ -861,6 +903,15 @@ function AdminScheduleContent() {
             </div>
 
             {/* Modals */}
+            <ArchiveModal 
+                isOpen={isArchiveModalOpen}
+                onClose={() => setIsArchiveModalOpen(false)}
+                onSelectDate={(date) => {
+                    setSelectedDate(date);
+                    setIsArchiveModalOpen(false);
+                }}
+            />
+
             <EditModal 
                 program={editingProgram} 
                 onClose={() => setEditingProgram(null)} 

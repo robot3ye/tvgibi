@@ -6,10 +6,11 @@ interface AdminHeaderProps {
     selectedDate: string;
     onDateSelect: (date: string) => void;
     onMenuClick: () => void;
+    onArchiveClick: () => void;
     selectedChannelName?: string;
 }
 
-export default function AdminHeader({ dateTabs, selectedDate, onDateSelect, onMenuClick, selectedChannelName }: AdminHeaderProps) {
+export default function AdminHeader({ dateTabs, selectedDate, onDateSelect, onMenuClick, onArchiveClick, selectedChannelName }: AdminHeaderProps) {
     return (
         <header className="bg-[#00FF00] p-2 flex items-center justify-between border-b-4 border-black">
             <div className="flex space-x-2 overflow-x-auto no-scrollbar">
@@ -28,6 +29,12 @@ export default function AdminHeader({ dateTabs, selectedDate, onDateSelect, onMe
                         </button>
                     );
                 })}
+                <button
+                    onClick={onArchiveClick}
+                    className="px-4 py-1 rounded-full text-xs font-bold font-mono border-2 border-black bg-gray-300 text-black hover:bg-gray-400 transition-transform active:scale-95 whitespace-nowrap"
+                >
+                    ARŞİV
+                </button>
             </div>
             
             <div className="flex items-center space-x-4 pl-4">

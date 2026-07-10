@@ -2,11 +2,12 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Draggable from 'react-draggable';
-import { Maximize2, Volume2, VolumeX, Plus, Minus, Youtube, Tv, ArrowUp } from 'lucide-react';
+import { Maximize2, Volume2, VolumeX, Plus, Minus, Youtube, Tv, ArrowUp, ExternalLink } from 'lucide-react';
 import { Channel, Program } from '../../data/mockData';
 import { getCurrentProgram } from '../../lib/api';
 import ZappingNoise from '../player/ZappingNoise';
 import StablePlayer from '../StablePlayer';
+import Link from 'next/link';
 
 interface HeroPlayerProps {
     channels: Channel[];
@@ -19,6 +20,7 @@ export default function HeroPlayer({ channels }: HeroPlayerProps) {
     const [initialOffset, setInitialOffset] = useState<number>(0);
     const [isMuted, setIsMuted] = useState(true);
     const [isFloating, setIsFloating] = useState(false);
+    const [floatWidth, setFloatWidth] = useState(320);
     const [isZapping, setIsZapping] = useState(true);
     
     const containerRef = useRef<HTMLDivElement>(null);
@@ -71,13 +73,13 @@ export default function HeroPlayer({ channels }: HeroPlayerProps) {
         loadChannel(currentIndex);
     }, [currentIndex, activeChannels.length]);
 
-    // Auto-zap every 15s
+    // Auto-zap every 10s
     useEffect(() => {
         if (activeChannels.length === 0) return;
         
         zapIntervalRef.current = setInterval(() => {
             setCurrentIndex((prev) => (prev + 1) % activeChannels.length);
-        }, 15000);
+        }, 10000);
 
         return () => {
             if (zapIntervalRef.current) clearInterval(zapIntervalRef.current);
@@ -159,7 +161,7 @@ export default function HeroPlayer({ channels }: HeroPlayerProps) {
         if (zapIntervalRef.current) clearInterval(zapIntervalRef.current);
         zapIntervalRef.current = setInterval(() => {
             setCurrentIndex((prev) => (prev + 1) % activeChannels.length);
-        }, 15000);
+        }, 10000);
     };
 
     const handleNextChannel = () => {
@@ -178,9 +180,9 @@ export default function HeroPlayer({ channels }: HeroPlayerProps) {
         const elem = document.getElementById('hero-player-wrapper');
         if (elem) {
             if (document.fullscreenElement) {
-                document.exitFullscreen();
+                document.exitFullscreen().catch(console.error);
             } else {
-                elem.requestFullscreen();
+                elem.requestFullscreen().catch(console.error);
             }
         }
     };
@@ -203,7 +205,7 @@ export default function HeroPlayer({ channels }: HeroPlayerProps) {
     const playerContent = (
         <div id="hero-player-wrapper" className="relative w-full h-full bg-black flex flex-col items-center justify-center overflow-hidden group pointer-events-auto">
             {/* Player itself */}
-            <div className="absolute inset-0 w-full h-full z-0">
+            <div className="absolute inset-0 w-full h-full z-0 pointer-events-auto">
                 {!isZapping && currentProgram && (
                     <StablePlayer 
                         url={`https://youtube.com/watch?v=${currentProgram.videoId}`}
@@ -213,50 +215,64 @@ export default function HeroPlayer({ channels }: HeroPlayerProps) {
                     />
                 )}
                 {!isZapping && !currentProgram && (
-                    <div className="w-full h-full flex flex-col items-center justify-center text-green-500 font-mono">
+                    <div className="w-full h-full flex flex-col items-center justify-center text-green-500 font-mono pointer-events-none">
                         <span className="text-xl md:text-3xl font-bold animate-pulse">SİNYAL BEKLENİYOR_</span>
                     </div>
                 )}
-                <ZappingNoise isZapping={isZapping} />
+                <div className="pointer-events-none absolute inset-0">
+                    <ZappingNoise isZapping={isZapping} />
+                </div>
             </div>
+
+            {/* Link wrapper over the entire player for easy access */}
+            <Link 
+                href={`/@${currentChannel.slug}`}
+                className="absolute inset-0 z-10 block"
+                title={`${currentChannel.name} Kanalına Git`}
+            />
 
             {/* UI Overlay - 100% Opacity */}
-            <div className="absolute top-4 left-4 z-20 flex items-start gap-4 pointer-events-none">
-                {/* Logo & Channel Name */}
-                <div 
-                    className="flex items-center gap-3 px-3 py-2 bg-black border-2"
-                    style={{ borderColor: channelColor }}
-                >
-                    {currentChannel.logo_main || currentChannel.logo_corner ? (
-                        <img 
-                            src={currentChannel.logo_main || currentChannel.logo_corner} 
-                            alt={currentChannel.name} 
-                            className="w-10 h-10 object-contain"
-                        />
-                    ) : (
-                        <div className="w-10 h-10 flex items-center justify-center text-xl font-bold text-white">
-                            {currentChannel.slug.substring(0,2).toUpperCase()}
+            {!isFloating && (
+                <div className="absolute top-4 left-4 z-20 flex flex-col gap-2 pointer-events-none">
+                    {/* Channel Name */}
+                    <div 
+                        className="flex items-center gap-3 px-3 py-2 bg-black border-2"
+                        style={{ borderColor: channelColor }}
+                    >
+                        <div className="flex flex-col">
+                            <span className="text-xs text-gray-400 font-mono">CH {(currentIndex + 1).toString().padStart(2, '0')}</span>
+                            <span className="text-sm font-bold text-white uppercase tracking-wider">{currentChannel.name}</span>
+                        </div>
+                    </div>
+
+                    {/* Current Program Info */}
+                    {currentProgram && (
+                        <div className="hidden md:flex flex-col bg-black/90 border-l-4 p-2 pointer-events-none" style={{ borderColor: channelColor }}>
+                            <span className="text-xs text-gray-400 font-mono">ŞU AN YAYINDA:</span>
+                            <span className="text-sm font-bold text-white line-clamp-1 max-w-[300px]">
+                                {currentProgram.title}
+                            </span>
                         </div>
                     )}
-                    <div className="flex flex-col">
-                        <span className="text-xs text-gray-400 font-mono">CH {(currentIndex + 1).toString().padStart(2, '0')}</span>
-                        <span className="text-sm font-bold text-white uppercase tracking-wider">{currentChannel.name}</span>
-                    </div>
                 </div>
+            )}
 
-                {/* Current Program Info */}
-                {currentProgram && (
-                    <div className="hidden md:flex flex-col bg-black/90 border-l-4 p-2 pointer-events-none" style={{ borderColor: channelColor }}>
-                        <span className="text-xs text-gray-400 font-mono">ŞU AN YAYINDA:</span>
-                        <span className="text-sm font-bold text-white line-clamp-1 max-w-[300px]">
-                            {currentProgram.title}
-                        </span>
-                    </div>
+            {/* Mini Remote (Always visible on the left side, below channel info) */}
+            <div className={`absolute top-1/2 -translate-y-1/2 left-4 z-30 flex flex-col gap-2 p-2 bg-black border-2 border-[#333] transition-opacity duration-300 pointer-events-auto`}>
+                {!isFloating && (
+                    <>
+                        <Link 
+                            href={`/@${currentChannel.slug}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-8 h-8 flex items-center justify-center hover:bg-[#222] text-white transition-colors"
+                            title="Kanalı Aç"
+                        >
+                            <ExternalLink size={18} />
+                        </Link>
+                        <div className="w-6 h-[1px] bg-[#333] my-1 mx-auto"></div>
+                    </>
                 )}
-            </div>
 
-            {/* Mini Remote (Hover to reveal or always visible on floating) */}
-            <div className={`absolute bottom-4 right-4 z-30 flex items-center gap-2 p-2 bg-black border-2 border-[#333] transition-opacity duration-300 ${isFloating ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
                 <button 
                     onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); }}
                     className="w-8 h-8 flex items-center justify-center hover:bg-[#222] text-white transition-colors"
@@ -265,47 +281,43 @@ export default function HeroPlayer({ channels }: HeroPlayerProps) {
                     {isMuted ? <VolumeX size={18} className="text-red-500" /> : <Volume2 size={18} className="text-green-500" />}
                 </button>
                 
-                <div className="w-[1px] h-6 bg-[#333] mx-1"></div>
-                
-                <button 
-                    onClick={(e) => { e.stopPropagation(); handlePrevChannel(); }}
-                    className="w-8 h-8 flex items-center justify-center hover:bg-[#222] text-white transition-colors"
-                    title="Önceki Kanal"
-                >
-                    <Minus size={18} />
-                </button>
-                
-                <div className="text-xs font-mono text-gray-400 font-bold px-1">CH</div>
-                
-                <button 
-                    onClick={(e) => { e.stopPropagation(); handleNextChannel(); }}
-                    className="w-8 h-8 flex items-center justify-center hover:bg-[#222] text-white transition-colors"
-                    title="Sonraki Kanal"
-                >
-                    <Plus size={18} />
-                </button>
+                {!isFloating && (
+                    <>
+                        <div className="w-6 h-[1px] bg-[#333] my-1 mx-auto"></div>
+                        
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); handlePrevChannel(); }}
+                            className="w-8 h-8 flex items-center justify-center hover:bg-[#222] text-white transition-colors"
+                            title="Önceki Kanal"
+                        >
+                            <Minus size={18} />
+                        </button>
+                        
+                        <div className="text-xs font-mono text-gray-400 font-bold text-center">CH</div>
+                        
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); handleNextChannel(); }}
+                            className="w-8 h-8 flex items-center justify-center hover:bg-[#222] text-white transition-colors"
+                            title="Sonraki Kanal"
+                        >
+                            <Plus size={18} />
+                        </button>
 
-                <div className="w-[1px] h-6 bg-[#333] mx-1"></div>
+                        <div className="w-6 h-[1px] bg-[#333] my-1 mx-auto"></div>
 
-                <button 
-                    onClick={(e) => { e.stopPropagation(); openInYouTube(); }}
-                    className="w-8 h-8 flex items-center justify-center hover:bg-[#222] text-white transition-colors"
-                    title="YouTube'da Aç"
-                >
-                    <Youtube size={18} />
-                </button>
-
-                <button 
-                    onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}
-                    className="w-8 h-8 flex items-center justify-center hover:bg-[#222] text-white transition-colors"
-                    title="Tam Ekran"
-                >
-                    <Maximize2 size={18} />
-                </button>
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); openInYouTube(); }}
+                            className="w-8 h-8 flex items-center justify-center hover:bg-[#222] text-white transition-colors"
+                            title="YouTube'da Aç"
+                        >
+                            <Youtube size={18} />
+                        </button>
+                    </>
+                )}
                 
                 {isFloating && (
                     <>
-                        <div className="w-[1px] h-6 bg-[#333] mx-1"></div>
+                        <div className="w-6 h-[1px] bg-[#333] my-1 mx-auto"></div>
                         <button 
                             onClick={(e) => { 
                                 e.stopPropagation(); 
@@ -322,8 +334,26 @@ export default function HeroPlayer({ channels }: HeroPlayerProps) {
             
             {/* Draggable handle for floating mode */}
             {isFloating && (
-                <div className="absolute top-0 left-0 w-full h-8 cursor-move z-40 bg-gradient-to-b from-black/80 to-transparent flex justify-center items-start pt-1">
-                    <div className="w-12 h-1 bg-white/30 rounded-full"></div>
+                <div className="absolute top-0 left-0 w-full h-8 cursor-move z-40 bg-gradient-to-b from-black/80 to-transparent flex justify-center items-start pt-1 group/handle">
+                    <div className="w-12 h-1 bg-white/30 rounded-full mt-1"></div>
+                    
+                    {/* Scale controls */}
+                    <div className="absolute top-1 right-2 flex gap-1 opacity-0 group-hover/handle:opacity-100 transition-opacity">
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); setFloatWidth(w => Math.max(240, w - 60)); }}
+                            className="w-5 h-5 flex items-center justify-center bg-black border border-white text-white text-xs hover:bg-white hover:text-black transition-colors"
+                            title="Küçült"
+                        >
+                            <Minus size={12} />
+                        </button>
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); setFloatWidth(w => Math.min(800, w + 60)); }}
+                            className="w-5 h-5 flex items-center justify-center bg-black border border-white text-white text-xs hover:bg-white hover:text-black transition-colors"
+                            title="Büyüt"
+                        >
+                            <Plus size={12} />
+                        </button>
+                    </div>
                 </div>
             )}
         </div>
@@ -350,9 +380,10 @@ export default function HeroPlayer({ channels }: HeroPlayerProps) {
                     ref={draggableRef}
                     className={
                         isFloating 
-                            ? "fixed bottom-8 right-8 w-[320px] aspect-video z-[100] border-2 border-green-500 bg-black shadow-2xl shadow-green-500/20 pointer-events-auto" 
+                            ? "fixed bottom-8 right-8 aspect-video z-[100] border-2 border-green-500 bg-black shadow-2xl shadow-green-500/20 pointer-events-auto transition-[width] duration-300" 
                             : "absolute inset-0 w-full h-full z-10 pointer-events-auto"
                     }
+                    style={isFloating ? { width: `${floatWidth}px` } : {}}
                 >
                     {playerContent}
                 </div>

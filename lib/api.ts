@@ -329,20 +329,32 @@ export const getLastProgram = async (channelId: string) => {
     return data;
 };
 
-export const getProgramsForChannel = async (channelId: string) => {
-    // Fetch ALL programs for the channel, or at least a wider range to support Admin view of past days
-    // Admin panel filtering is done client-side, so we need to fetch enough data.
-    // Let's fetch past 7 days and future 7 days for now to be safe and cover "Today" properly even if it's late at night.
-    
-    const now = new Date();
-    const startFilter = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString(); // 7 days ago
-    
-    const { data, error } = await supabase
+export const getProgramsForChannel = async (channelId: string, dateStr?: string) => {
+    let query = supabase
         .from('programs')
         .select('*')
         .eq('channel_id', channelId)
-        .gte('end_time', startFilter)
         .order('start_time', { ascending: true });
+        
+    if (dateStr) {
+        const startOfDay = new Date(dateStr);
+        startOfDay.setHours(0, 0, 0, 0);
+        
+        const endWindow = new Date(dateStr);
+        endWindow.setDate(endWindow.getDate() + 7);
+        endWindow.setHours(23, 59, 59, 999);
+        
+        query = query
+            .lte('start_time', endWindow.toISOString())
+            .gte('end_time', startOfDay.toISOString())
+            .limit(3000);
+    } else {
+        const now = new Date();
+        const startFilter = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        query = query.gte('end_time', startFilter).limit(3000);
+    }
+        
+    const { data, error } = await query;
         
     if (error) {
         console.error('Error fetching channel programs:', error);

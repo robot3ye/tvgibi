@@ -3,13 +3,16 @@
 import React, { useEffect, useState, use, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import { ArrowLeft, Clock, Volume2, VolumeX, Maximize, Copy, List, ChevronLeft, ChevronRight, GripHorizontal, Zap, Volume1, Shuffle, Youtube, Power } from 'lucide-react';
+import { ArrowLeft, Clock, Volume2, VolumeX, Maximize, Copy, List, ChevronLeft, ChevronRight, GripHorizontal, Zap, Volume1, Shuffle, Youtube, Power, MessageSquare } from 'lucide-react';
 import screenfull from 'screenfull';
 import { Program, Channel } from '../../data/mockData';
 import { getChannels, getCurrentProgram } from '../../lib/api';
 
 import RemoteControl from '../../components/player/RemoteControl';
 import ZappingNoise from '../../components/player/ZappingNoise';
+import ZappSettingsModal from '../../components/player/ZappSettingsModal';
+import ScrambleText from '../../components/ui/ScrambleText';
+import ScheduleModal from '../../components/player/ScheduleModal';
 
 // Dynamic import with SSR disabled to prevent hydration errors
 const StablePlayer = dynamic(() => import('../../components/StablePlayer'), { ssr: false });
@@ -41,11 +44,20 @@ export default function ChannelPage({ params }: PageProps) {
   const [subtitleLang, setSubtitleLang] = useState<string | null>(null); // State for subtitles
   const [hasInteracted, setHasInteracted] = useState(true); // Default true, checked in effect
   const [isZapping, setIsZapping] = useState(false);
+  const isZappingRef = useRef(false);
   const [showVolumeOSD, setShowVolumeOSD] = useState(false);
   const [showSubtitleOSD, setShowSubtitleOSD] = useState(false);
   const [showChannelListModal, setShowChannelListModal] = useState(false);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showOldRemote, setShowOldRemote] = useState(false);
   const [showUI, setShowUI] = useState(true);
+  
+  // Zapp State
+  const [showZappModal, setShowZappModal] = useState(false);
+  const [zappMode, setZappMode] = useState<'10' | '30' | '60' | 'random' | null>(null);
+  const [zappCountdown, setZappCountdown] = useState<number | null>(null);
+  const zappIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const mouseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const volumeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -220,13 +232,14 @@ export default function ChannelPage({ params }: PageProps) {
 
   // Helper for Zapping Effect
   const triggerZap = (newSlug: string) => {
-      if (newSlug === activeSlug || isZapping) return;
+      if (newSlug === activeSlug || isZappingRef.current) return;
       
       // OSD Volume'u kapat
       setShowVolumeOSD(false);
       if (volumeTimeoutRef.current) clearTimeout(volumeTimeoutRef.current);
 
       setIsZapping(true);
+      isZappingRef.current = true;
       
       // Force unmount the old player IMMEDIATELY by clearing states before we pushState
       setCurrentProgram(null);
@@ -253,6 +266,7 @@ export default function ChannelPage({ params }: PageProps) {
           // Fixed timeout for zap noise (2.5s gives enough time for API and YouTube to load behind it)
               setTimeout(() => {
                   setIsZapping(false);
+                  isZappingRef.current = false;
 
                   if (audioRef.current) {
                       audioRef.current.pause();
@@ -341,18 +355,75 @@ export default function ChannelPage({ params }: PageProps) {
   };
 
   const handlePrevChannel = () => {
-      if (!channel || allChannels.length === 0) return;
-      const currentIndex = allChannels.findIndex(c => c.id === channel.id);
+      if (allChannels.length === 0) return;
+      const currentIndex = allChannels.findIndex(c => c.slug === activeSlug);
+      if (currentIndex === -1) return;
       const prevIndex = (currentIndex - 1 + allChannels.length) % allChannels.length;
       triggerZap(allChannels[prevIndex].slug);
   };
 
   const handleNextChannel = () => {
-      if (!channel || allChannels.length === 0) return;
-      const currentIndex = allChannels.findIndex(c => c.id === channel.id);
+      if (allChannels.length === 0) return;
+      const currentIndex = allChannels.findIndex(c => c.slug === activeSlug);
+      if (currentIndex === -1) return;
       const nextIndex = (currentIndex + 1) % allChannels.length;
       triggerZap(allChannels[nextIndex].slug);
   };
+
+  // Zapp Logic
+  const handleZappToggle = (e?: React.MouseEvent) => {
+      if (e) {
+          e.preventDefault();
+          e.stopPropagation();
+      }
+      if (zappMode) {
+          // If active, turn it off
+          setZappMode(null);
+          setZappCountdown(null);
+          if (zappIntervalRef.current) clearInterval(zappIntervalRef.current);
+      } else {
+          // If inactive, show modal
+          setShowZappModal(true);
+      }
+  };
+
+  useEffect(() => {
+      if (!zappMode || allChannels.length === 0) {
+          setZappCountdown(null);
+          if (zappIntervalRef.current) clearInterval(zappIntervalRef.current);
+          return;
+      }
+
+      let delay = 10;
+      if (zappMode === '30') delay = 30;
+      else if (zappMode === '60') delay = 60;
+      else if (zappMode === 'random') {
+          delay = Math.floor(Math.random() * (30 - 10 + 1)) + 10; // Random between 10s and 30s
+      }
+
+      setZappCountdown(delay);
+      if (zappIntervalRef.current) clearInterval(zappIntervalRef.current);
+
+      zappIntervalRef.current = setInterval(() => {
+          setZappCountdown(prev => {
+              if (prev === null) return null;
+              if (prev <= 1) {
+                  // Trigger zap using latest activeSlug via allChannels loop
+                  const currentIndex = allChannels.findIndex(c => c.slug === activeSlug);
+                  if (currentIndex !== -1) {
+                      const nextIndex = (currentIndex + 1) % allChannels.length;
+                      triggerZap(allChannels[nextIndex].slug);
+                  }
+                  return 0; // The next useEffect execution (on activeSlug change) will reset the timer
+              }
+              return prev - 1;
+          });
+      }, 1000);
+
+      return () => {
+          if (zappIntervalRef.current) clearInterval(zappIntervalRef.current);
+      };
+  }, [zappMode, activeSlug, allChannels]); // Re-run whenever activeSlug changes so the timer restarts
 
   const handleRandomChannel = () => {
       if (!channel || allChannels.length === 0) return;
@@ -406,7 +477,7 @@ export default function ChannelPage({ params }: PageProps) {
       );
   }
 
-  const channelIndex = allChannels.findIndex(c => c.id === channel?.id);
+  const channelIndex = allChannels.findIndex((c) => c.id === channel?.id);
   const channelNumber = String(channelIndex + 1).padStart(2, '0');
 
   return (
@@ -458,10 +529,16 @@ export default function ChannelPage({ params }: PageProps) {
           <div className="absolute inset-0 border-[25px] pointer-events-none" style={{ borderColor: channel.color_primary || '#00FF4F' }} />
 
           {/* Top Links */}
-          <div className="absolute top-0 left-[25px] h-[25px] flex items-center gap-4 md:gap-6 text-black font-black text-[10px] md:text-xs pointer-events-auto px-4 z-50">
-            <button onClick={() => router.push('/')} className="hover:underline tracking-widest">ANASAYFA</button>
-            <button onClick={() => setShowChannelListModal(true)} className="hover:underline tracking-widest">KANAL LİSTESİ</button>
-            <button onClick={() => router.push(`/schedule/${activeSlug}`)} className="hover:underline tracking-widest">YAYIN AKIŞI</button>
+          <div className="absolute top-0 right-[25px] h-[25px] flex items-center gap-4 md:gap-6 text-black font-black text-[10px] md:text-xs pointer-events-auto px-4 z-50">
+            <button onClick={() => router.push('/')} className="hover:underline hover:decoration-[#00ff00] hover:decoration-2 underline-offset-4 tracking-widest">
+                <ScrambleText text="ANASAYFA" delay={0.1} className="text-black" hoverClassName="text-black" />
+            </button>
+            <button onClick={() => setShowChannelListModal(true)} className="hover:underline hover:decoration-[#00ff00] hover:decoration-2 underline-offset-4 tracking-widest">
+                <ScrambleText text="KANAL LİSTESİ" delay={0.2} className="text-black" hoverClassName="text-black" />
+            </button>
+            <button onClick={() => setShowScheduleModal(true)} className="hover:underline hover:decoration-[#00ff00] hover:decoration-2 underline-offset-4 tracking-widest">
+                <ScrambleText text="YAYIN AKIŞI" delay={0.3} className="text-black" hoverClassName="text-black" />
+            </button>
           </div>
 
           {/* Right Info Box */}
@@ -522,7 +599,7 @@ export default function ChannelPage({ params }: PageProps) {
           {/* Bottom Kumanda Box */}
           <div className="absolute bottom-[25px] left-[25px] right-[25px] h-auto flex flex-col bg-[#7a1e84] border-4 border-black pointer-events-auto">
              {/* Color separator */}
-             <div className="flex h-4 w-full">
+             <div className="flex h-4 w-full relative z-0">
                <div className="flex-1 bg-gray-400 h-full"></div>
                <div className="flex-1 bg-yellow-400 h-full"></div>
                <div className="flex-1 bg-cyan-400 h-full"></div>
@@ -534,69 +611,115 @@ export default function ChannelPage({ params }: PageProps) {
              </div>
              
              {/* Controls */}
-             <div className="flex items-center justify-between p-4 px-6 overflow-x-auto gap-4">
+             <div className="flex items-center justify-between p-4 px-6 overflow-visible gap-4 relative z-50">
                 <div className="text-[#dafe00] font-black text-xl md:text-2xl truncate shrink-0 max-w-[40%]">
                    {currentProgram?.title || 'SİNYAL BEKLENİYOR_'}
                 </div>
                 
                 <div className="flex items-center gap-2 md:gap-3 shrink-0">
                    {/* Zap */}
-                   <button className="w-10 h-10 flex items-center justify-center bg-[#edff00] border-[3px] border-black text-[#ff0000] hover:scale-105 active:scale-95 transition-transform shrink-0">
-                     <Zap size={20} className="fill-current" strokeWidth={0} />
-                   </button>
+                   {zappMode ? (
+                       <button onClick={handleZappToggle} className="group relative h-10 px-4 flex items-center justify-center gap-2 bg-[#ff0000] border-[3px] border-black text-white font-black hover:scale-105 active:scale-95 transition-all shrink-0 animate-pulse min-w-[160px]">
+                           <Zap size={20} className="fill-current" strokeWidth={0} />
+                           ZAPP'I DURDUR {zappCountdown !== null ? `(${zappCountdown}s)` : ''}
+                           <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 hidden group-hover:block whitespace-nowrap bg-[#00ff00] text-black border-[3px] border-black px-2 py-1 text-[10px] md:text-xs font-black uppercase z-[100] pointer-events-none">
+                               ZAPP MODUNU KAPAT
+                           </span>
+                       </button>
+                   ) : (
+                       <button onClick={handleZappToggle} className="group relative w-10 h-10 flex items-center justify-center bg-[#edff00] border-[3px] border-black text-[#ff0000] hover:scale-105 active:scale-95 transition-transform shrink-0">
+                           <Zap size={20} className="fill-current" strokeWidth={0} />
+                           <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 hidden group-hover:block whitespace-nowrap bg-[#00ff00] text-black border-[3px] border-black px-2 py-1 text-[10px] md:text-xs font-black uppercase z-[100] pointer-events-none">
+                               ZAPP (OTOMATİK GEÇİŞ)
+                           </span>
+                       </button>
+                   )}
 
                    {/* Prev Channel */}
-                   <button onClick={handlePrevChannel} className="w-10 h-10 flex items-center justify-center bg-[#00ff00] border-[3px] border-black text-black hover:scale-105 active:scale-95 transition-transform shrink-0">
+                   <button onClick={handlePrevChannel} className="group relative w-10 h-10 flex items-center justify-center bg-[#00ff00] border-[3px] border-black text-black hover:scale-105 active:scale-95 transition-transform shrink-0">
                      <ChevronLeft size={24} strokeWidth={3} />
+                     <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 hidden group-hover:block whitespace-nowrap bg-[#00ff00] text-black border-[3px] border-black px-2 py-1 text-[10px] md:text-xs font-black uppercase z-[100] pointer-events-none">
+                         ÖNCEKİ KANAL
+                     </span>
                    </button>
 
                    {/* Next Channel */}
-                   <button onClick={handleNextChannel} className="w-10 h-10 flex items-center justify-center bg-[#00ff00] border-[3px] border-black text-black hover:scale-105 active:scale-95 transition-transform shrink-0">
+                   <button onClick={handleNextChannel} className="group relative w-10 h-10 flex items-center justify-center bg-[#00ff00] border-[3px] border-black text-black hover:scale-105 active:scale-95 transition-transform shrink-0">
                      <ChevronRight size={24} strokeWidth={3} />
+                     <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 hidden group-hover:block whitespace-nowrap bg-[#00ff00] text-black border-[3px] border-black px-2 py-1 text-[10px] md:text-xs font-black uppercase z-[100] pointer-events-none">
+                         SONRAKİ KANAL
+                     </span>
                    </button>
                    
                    <div className="w-[2px] h-8 bg-black/30 mx-1 shrink-0"></div>
                    
                    {/* Vol Down */}
-                   <button onClick={() => handleVolumeChange(Math.max(volume - 10, 0))} className="w-10 h-10 flex items-center justify-center bg-[#ff6200] border-[3px] border-black text-black hover:scale-105 active:scale-95 transition-transform shrink-0">
+                   <button onClick={() => handleVolumeChange(Math.max(volume - 10, 0))} className="group relative w-10 h-10 flex items-center justify-center bg-[#ff6200] border-[3px] border-black text-black hover:scale-105 active:scale-95 transition-transform shrink-0">
                      <Volume1 size={20} strokeWidth={3} />
+                     <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 hidden group-hover:block whitespace-nowrap bg-[#00ff00] text-black border-[3px] border-black px-2 py-1 text-[10px] md:text-xs font-black uppercase z-[100] pointer-events-none">
+                         SESİ KIS
+                     </span>
                    </button>
 
                    {/* Vol Up */}
-                   <button onClick={() => handleVolumeChange(Math.min(volume + 10, 100))} className="w-10 h-10 flex items-center justify-center bg-[#ff6200] border-[3px] border-black text-black hover:scale-105 active:scale-95 transition-transform shrink-0">
+                   <button onClick={() => handleVolumeChange(Math.min(volume + 10, 100))} className="group relative w-10 h-10 flex items-center justify-center bg-[#ff6200] border-[3px] border-black text-black hover:scale-105 active:scale-95 transition-transform shrink-0">
                      <Volume2 size={20} strokeWidth={3} />
+                     <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 hidden group-hover:block whitespace-nowrap bg-[#00ff00] text-black border-[3px] border-black px-2 py-1 text-[10px] md:text-xs font-black uppercase z-[100] pointer-events-none">
+                         SESİ AÇ
+                     </span>
                    </button>
 
                    {/* Mute */}
-                   <button onClick={() => handleVolumeChange(0)} className="w-10 h-10 flex items-center justify-center bg-[#8e2121] border-[3px] border-black text-white hover:scale-105 active:scale-95 transition-transform shrink-0">
+                   <button onClick={() => handleVolumeChange(0)} className="group relative w-10 h-10 flex items-center justify-center bg-[#8e2121] border-[3px] border-black text-white hover:scale-105 active:scale-95 transition-transform shrink-0">
                      <VolumeX size={20} strokeWidth={3} />
+                     <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 hidden group-hover:block whitespace-nowrap bg-[#00ff00] text-black border-[3px] border-black px-2 py-1 text-[10px] md:text-xs font-black uppercase z-[100] pointer-events-none">
+                         SESSİZ
+                     </span>
                    </button>
 
                    <div className="w-[2px] h-8 bg-black/30 mx-1 shrink-0"></div>
 
                    {/* Subtitle */}
-                   <button onClick={handleSubtitleToggle} className="w-10 h-10 flex items-center justify-center bg-white border-[3px] border-black text-black hover:scale-105 active:scale-95 transition-transform font-bold text-sm shrink-0">
-                     CC
+                   <button 
+                     onClick={handleSubtitleToggle}
+                     className={`group relative w-10 h-10 flex items-center justify-center border-[3px] border-black hover:scale-105 active:scale-95 transition-transform shrink-0 ${subtitleLang === 'tr' ? 'bg-[#ff00ff] text-white' : 'bg-gray-400 text-black'}`}
+                   >
+                     <MessageSquare size={20} strokeWidth={3} />
+                     <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 hidden group-hover:block whitespace-nowrap bg-[#00ff00] text-black border-[3px] border-black px-2 py-1 text-[10px] md:text-xs font-black uppercase z-[100] pointer-events-none">
+                         {subtitleLang === 'tr' ? 'ALTYAZIYI KAPAT' : 'ALTYAZIYI AÇ'}
+                     </span>
                    </button>
-                   
+
                    {/* Random Channel */}
-                   <button onClick={handleRandomChannel} className="w-10 h-10 flex items-center justify-center bg-yellow-400 border-[3px] border-black text-black hover:scale-105 active:scale-95 transition-transform shrink-0">
+                   <button onClick={handleRandomChannel} className="group relative w-10 h-10 flex items-center justify-center bg-yellow-400 border-[3px] border-black text-black hover:scale-105 active:scale-95 transition-transform shrink-0">
                      <Shuffle size={20} strokeWidth={3} />
+                     <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 hidden group-hover:block whitespace-nowrap bg-[#00ff00] text-black border-[3px] border-black px-2 py-1 text-[10px] md:text-xs font-black uppercase z-[100] pointer-events-none">
+                         RASTGELE KANAL
+                     </span>
                    </button>
 
                    {/* YouTube Link */}
-                   <button onClick={() => { if (currentProgram) window.open(`https://youtube.com/watch?v=${currentProgram.videoId}`, '_blank'); }} className="w-10 h-10 flex items-center justify-center bg-black border-[3px] border-black text-red-500 hover:scale-105 active:scale-95 transition-transform shrink-0">
+                   <button onClick={() => { if (currentProgram) window.open(`https://youtube.com/watch?v=${currentProgram.videoId}`, '_blank'); }} className="group relative w-10 h-10 flex items-center justify-center bg-black border-[3px] border-black text-red-500 hover:scale-105 active:scale-95 transition-transform shrink-0">
                      <Youtube size={20} />
+                     <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 hidden group-hover:block whitespace-nowrap bg-[#00ff00] text-black border-[3px] border-black px-2 py-1 text-[10px] md:text-xs font-black uppercase z-[100] pointer-events-none">
+                         YOUTUBE'DA AÇ
+                     </span>
                    </button>
 
                    {/* Full Screen */}
-                   <button onClick={handleFullscreen} className="w-10 h-10 flex items-center justify-center bg-white border-[3px] border-black text-black hover:scale-105 active:scale-95 transition-transform shrink-0">
+                   <button onClick={handleFullscreen} className="group relative w-10 h-10 flex items-center justify-center bg-white border-[3px] border-black text-black hover:scale-105 active:scale-95 transition-transform shrink-0">
                      <Maximize size={20} strokeWidth={3} />
+                     <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 hidden group-hover:block whitespace-nowrap bg-[#00ff00] text-black border-[3px] border-black px-2 py-1 text-[10px] md:text-xs font-black uppercase z-[100] pointer-events-none">
+                         TAM EKRAN
+                     </span>
                    </button>
                    
                    {/* Turn off TV */}
-                   <button onClick={handleTurnOffTV} className="w-10 h-10 flex items-center justify-center bg-red-600 border-[3px] border-black text-white hover:scale-105 active:scale-95 transition-transform shrink-0">
+                   <button onClick={handleTurnOffTV} className="group relative w-10 h-10 flex items-center justify-center bg-red-600 border-[3px] border-black text-white hover:scale-105 active:scale-95 transition-transform shrink-0">
                      <Power size={20} strokeWidth={3} />
+                     <span className="absolute bottom-full right-0 mb-3 hidden group-hover:block whitespace-nowrap bg-[#00ff00] text-black border-[3px] border-black px-2 py-1 text-[10px] md:text-xs font-black uppercase z-[100] pointer-events-none">
+                         TV'Yİ KAPAT
+                     </span>
                    </button>
                 </div>
              </div>
@@ -620,7 +743,7 @@ export default function ChannelPage({ params }: PageProps) {
               onNextChannel={handleNextChannel}
               onOpenChannelList={() => setShowChannelListModal(true)}
               onGoHome={() => router.push('/')}
-              onOpenSchedule={() => router.push(`/schedule/${activeSlug}`)}
+              onOpenSchedule={() => setShowScheduleModal(true)}
               channelColor={channel.color_primary || '#00FF4F'}
               onSelectChannelNumber={(num: number) => {
                   let targetIndex = num === 0 ? 9 : num - 1;
@@ -670,6 +793,21 @@ export default function ChannelPage({ params }: PageProps) {
               </div>
           </div>
       )}
+
+      <ZappSettingsModal 
+          isOpen={showZappModal} 
+          onClose={() => setShowZappModal(false)} 
+          onSelect={(mode) => {
+              setZappMode(mode);
+              setShowZappModal(false);
+          }} 
+      />
+
+      <ScheduleModal 
+          isOpen={showScheduleModal} 
+          onClose={() => setShowScheduleModal(false)} 
+          channelSlug={activeSlug} 
+      />
     </div>
   );
 }

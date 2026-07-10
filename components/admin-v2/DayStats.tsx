@@ -5,13 +5,18 @@ interface DayStatsProps {
     selectedDate: string;
     totalDurationSeconds: number;
     currentProgram?: { title: string; thumbnail?: string };
+    channelSlug?: string;
 }
 
-export default function DayStats({ selectedDate, totalDurationSeconds, currentProgram }: DayStatsProps) {
+export default function DayStats({ selectedDate, totalDurationSeconds, currentProgram, channelSlug }: DayStatsProps) {
     const dateObj = new Date(selectedDate);
     // Get Day Name in Turkish (e.g., CUMARTESİ)
     const dayName = dateObj.toLocaleDateString('tr-TR', { weekday: 'long' }).toUpperCase();
     
+    // Format the date as DD.MM.YYYY
+    const [year, month, day] = selectedDate.split('-');
+    const formattedDate = `${day}.${month}.${year}`;
+
     // Format Duration
     const h = Math.floor(totalDurationSeconds / 3600);
     const m = Math.floor((totalDurationSeconds % 3600) / 60);
@@ -36,7 +41,10 @@ export default function DayStats({ selectedDate, totalDurationSeconds, currentPr
                         <>
                             <img src={currentProgram.thumbnail} alt="Live" className="w-full h-full object-cover opacity-80" />
                             <div className="absolute bottom-4 right-4">
-                                <button className="bg-black text-[#00FF00] border-2 border-[#00FF00] px-4 py-1 text-sm font-bold hover:bg-[#00FF00] hover:text-black transition-colors">
+                                <button 
+                                    onClick={() => channelSlug && window.open(`/${channelSlug}`, '_blank')}
+                                    className="bg-black text-[#00FF00] border-2 border-[#00FF00] px-4 py-1 text-sm font-bold hover:bg-[#00FF00] hover:text-black transition-colors"
+                                >
                                     YAYINA BAĞLAN
                                 </button>
                             </div>
@@ -59,7 +67,7 @@ export default function DayStats({ selectedDate, totalDurationSeconds, currentPr
 
             {/* Right: Stats (Orange) */}
             <div className="w-full md:w-2/3 bg-[#FF6600] p-8 flex flex-col justify-center relative">
-                <h2 className="text-4xl text-white font-normal mb-2">Yayın Akışı_</h2>
+                <h2 className="text-4xl text-white font-normal mb-2">Yayın Akışı_ {formattedDate}</h2>
                 <h1 className="text-6xl md:text-8xl font-black text-[#99FFCC] tracking-tighter leading-none mb-4">
                     {dayName}
                 </h1>
