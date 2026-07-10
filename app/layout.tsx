@@ -20,8 +20,8 @@ const jetBrainsMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "TVGuide",
-  description: "Modern TV Guide Application",
+  title: "tvgibi | bir televizyon simülasyonu",
+  description: "Bir televizyon simülasyonu",
 };
 
 export default function RootLayout({
