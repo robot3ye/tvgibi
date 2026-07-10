@@ -126,8 +126,8 @@ const StablePlayer: React.FC<StablePlayerProps> = ({ url, initialStart, volume, 
   }
 
   return (
-        <div className="absolute inset-0 w-full h-full bg-black overflow-hidden pointer-events-auto">
-            {/* The iframe wrapper allows pointer events so user can interact with the video */}
+        <div className="absolute inset-0 w-full h-full bg-black overflow-hidden pointer-events-none">
+            {/* The iframe wrapper prevents pointer events so user cannot interact directly with the video */}
             <iframe
                 ref={iframeRef}
         width="100%"
@@ -138,8 +138,8 @@ const StablePlayer: React.FC<StablePlayerProps> = ({ url, initialStart, volume, 
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
         allowFullScreen
         onLoad={handleIframeLoad}
-        className="w-full h-full object-contain" // object-contain to fit video without crop
-        style={{ pointerEvents: 'auto' }}
+        className="w-full h-full object-contain pointer-events-none" // object-contain to fit video without crop
+        style={{ pointerEvents: 'none' }}
       />
     </div>
   );
