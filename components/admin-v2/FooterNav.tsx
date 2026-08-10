@@ -6,7 +6,8 @@ export default function FooterNav() {
         { label: "ANASAYFA", date: "FRONT_PAGE", href: "/" },
         { label: "YAYIN AKIŞI (ADMİN)", date: "SCHEDULE", href: "/admin/schedule" },
         { label: "MÜZİK HAVUZU", date: "SMART_POOL", href: "/admin/pool" },
-        { label: "KANAL MİKSERİ", date: "CH_MIXER", href: "/admin/mixer" },
+        { label: "KANAL MİKSERİ", date: "DJ_MIXER", href: "/admin/mixer" },
+        { label: "GOD'S EYE", date: "CTRL_ROOM", href: "/admin/gods-eye" },
         { label: "SCREEN CLUB", date: "EMMY_CHAT", href: "/screenclub" },
     ];
     
