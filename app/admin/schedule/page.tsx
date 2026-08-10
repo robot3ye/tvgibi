@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
     getChannels, addProgram, getProgramsForChannel, 
-    deleteProgram, deletePrograms, updateProgram, reorderPrograms 
+    deleteProgram, deletePrograms, updateProgram, reorderPrograms,
+    generateScheduleFromMixer 
 } from '../../../lib/api';
 import { fetchVideoDetails, YouTubeVideoDetails } from '../../../lib/youtube';
 import { Channel, Program } from '../../../data/mockData';
@@ -432,6 +433,21 @@ function AdminScheduleContent() {
         }
     };
 
+    const handleAutoMixer = async () => {
+        if (!selectedChannelId || !selectedDate) return;
+        setAdding(true);
+        try {
+            const added = await generateScheduleFromMixer(selectedChannelId, selectedDate);
+            await loadChannelPrograms(selectedChannelId, selectedDate);
+            setToast({ message: `Mikser tamamlandı! ${added.length} şarkı eklendi.`, type: 'success' });
+        } catch (err: any) {
+            console.error(err);
+            setToast({ message: err.message || 'Mikser hatası oluştu.', type: 'error' });
+        } finally {
+            setAdding(false);
+        }
+    };
+
     const handleDeleteProgram = async (id: string) => {
         if (!confirm('Silmek istediğinize emin misiniz?')) return;
         try {
@@ -783,13 +799,48 @@ function AdminScheduleContent() {
                         onCancel={() => { setVideo(null); setUrl(''); setIsVideoDetailsModalOpen(false); }}
                         onAddFiller={handleAddFiller}
                         onBulkAddClick={() => setIsBulkAddModalOpen(true)}
+                        onAutoMixerClick={handleAutoMixer}
                         loading={loading}
                         adding={adding}
                     />
                 )}
             </div>
 
-            {/* Day Stats (Hero) */}
+            {/* Floating Duration Info Box */}
+            <div className="fixed bottom-8 left-8 z-40 bg-black/70 border-2 border-[#00FF4F] text-[#00FF4F] p-3 font-mono shadow-[4px_4px_0px_0px_rgba(0,255,79,0.7)] flex flex-col pointer-events-none transition-transform duration-300 backdrop-blur-sm"
+                 style={{ transform: selectedProgramIds.length > 0 ? 'translateY(-100px)' : 'translateY(0)' }}>
+                <span className="text-[10px] opacity-80 uppercase tracking-widest border-b border-[#00FF4F]/30 pb-1 mb-1">
+                    {selectedDate ? new Date(selectedDate).toLocaleDateString('tr-TR', { weekday: 'long' }) : ''} YAYINI
+                </span>
+                <span className="font-bold text-lg mb-1">
+                    {Math.floor(totalDurationSeconds / 3600)}s {Math.floor((totalDurationSeconds % 3600) / 60)}dk
+                </span>
+                {(() => {
+                    const remainingSeconds = (24 * 3600) - totalDurationSeconds;
+                    if (remainingSeconds > 0) {
+                        return (
+                            <span className="text-[10px] text-[#00FFFF] font-bold">
+                                Kalan: {Math.floor(remainingSeconds / 3600)}s {Math.floor((remainingSeconds % 3600) / 60)}dk
+                            </span>
+                        );
+                    } else if (remainingSeconds < 0) {
+                        const overflow = Math.abs(remainingSeconds);
+                        return (
+                            <span className="text-[10px] text-[#FF0000] font-bold">
+                                Taşan: {Math.floor(overflow / 3600)}s {Math.floor((overflow % 3600) / 60)}dk
+                            </span>
+                        );
+                    } else {
+                        return (
+                            <span className="text-[10px] text-[#00FF4F] font-bold">
+                                Tam 24 Saat!
+                            </span>
+                        );
+                    }
+                })()}
+            </div>
+
+            {/* Day Stats (Hero) - Reverted to non-sticky */}
             <DayStats 
                 selectedDate={selectedDate} 
                 totalDurationSeconds={totalDurationSeconds}

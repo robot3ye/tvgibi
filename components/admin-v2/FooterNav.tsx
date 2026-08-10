@@ -1,14 +1,13 @@
 import React from 'react';
+import Link from 'next/link';
 
 export default function FooterNav() {
     const navItems = [
-        { label: "DE FORM A SODWN", date: "2020-01-11" },
-        { label: "KAY+E OH SUOPE", date: "2040-02-K4" },
-        { label: "SOLARIS DOME", date: "2045-01-21" },
-        { label: "N7 A<PHITAEATEA", date: "2040-02-64" },
-        { label: "TITAN ORBIT ARENA", date: "2045-03-30" },
-        { label: "IO LUNAR HALL", date: "2045-04-25" },
-        { label: "HELIOS GRAND STAGE", date: "2045-05-19" },
+        { label: "ANASAYFA", date: "FRONT_PAGE", href: "/" },
+        { label: "YAYIN AKIŞI (ADMİN)", date: "SCHEDULE", href: "/admin/schedule" },
+        { label: "MÜZİK HAVUZU", date: "SMART_POOL", href: "/admin/pool" },
+        { label: "KANAL MİKSERİ", date: "CH_MIXER", href: "/admin/mixer" },
+        { label: "SCREEN CLUB", date: "EMMY_CHAT", href: "/screenclub" },
     ];
     
     const rightItems = [

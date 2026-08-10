@@ -1,0 +1,1 @@
+ALTER TABLE public.content_pool ADD COLUMN IF NOT EXISTS vocal_type TEXT;

@@ -20,6 +20,7 @@ const mapChannel = (dbChannel: any): Channel => {
           editors: dbChannel.editors || [],
           is_online: dbChannel.is_online ?? true,
           sort_order: dbChannel.sort_order || 0,
+          mixer_config: dbChannel.mixer_config || {},
       };
   } catch (err) {
       console.error('Error mapping channel:', dbChannel, err);
@@ -287,13 +288,277 @@ export const deleteProgram = async (programId: string) => {
 };
 
 export const deletePrograms = async (programIds: string[]) => {
+    if (programIds.length === 0) return;
     const { error } = await supabase
         .from('programs')
         .delete()
         .in('id', programIds);
+        
+    if (error) {
+        console.error('Error deleting multiple programs:', error);
+    }
+};
+
+export const addMultiplePrograms = async (programs: any[]) => {
+    if (programs.length === 0) return [];
+    const { data, error } = await supabase
+        .from('programs')
+        .insert(programs)
+        .select();
     
     if (error) {
-        console.error('Error deleting programs:', error);
+        console.error('Error adding multiple programs:', error);
+        throw error;
+    }
+    return data;
+};
+
+export const generateScheduleFromMixer = async (channelId: string, dateStr: string) => {
+    // 1. Fetch channel config
+    const channels = await getChannels();
+    const channel = channels.find(c => c.id === channelId);
+    if (!channel) throw new Error("Kanal bulunamadı");
+    
+    const config = channel.mixer_config || {};
+    const categories = config.categories || [];
+    const eras = config.eras || [];
+    const vocals = config.vocals || [];
+    const minEnergy = config.minEnergy || 1;
+    const maxEnergy = config.maxEnergy || 10;
+    
+    if (categories.length === 0) {
+        throw new Error("Bu kanal için Kategori ağırlığı ayarlanmamış. Lütfen önce Kanal Mikseri'ni ayarlayın.");
+    }
+    
+    // 2. Fetch all pool items
+    const pool = await getPoolItems();
+    
+    // 3. Filter pool based on hard constraints
+    const eligibleItems = pool.filter(item => {
+        if (item.energy_level < minEnergy || item.energy_level > maxEnergy) return false;
+        if (eras.length > 0 && (!item.era || !eras.some((e: any) => e.name === item.era))) return false;
+        if (vocals.length > 0 && (!item.vocal_type || !vocals.some((v: any) => v.name === item.vocal_type))) return false;
+        return true;
+    });
+    
+    if (eligibleItems.length === 0) {
+        throw new Error("Mikser kurallarına uygun hiçbir şarkı bulunamadı. Lütfen filtreleri esnetin.");
+    }
+    
+    // Group eligible items by category
+    const itemsByCategory: Record<string, PoolItem[]> = {};
+    for (const item of eligibleItems) {
+        if (!itemsByCategory[item.category]) itemsByCategory[item.category] = [];
+        itemsByCategory[item.category].push(item);
+    }
+    
+    // 4. Calculate starting time
+    const startOfDay = new Date(dateStr);
+    startOfDay.setHours(0, 0, 0, 0); 
+    
+    const endOfDay = new Date(startOfDay);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    let currentStart = new Date(startOfDay);
+    
+    // Find the latest program for this day
+    const { data: existingData } = await supabase
+        .from('programs')
+        .select('end_time, video_id')
+        .eq('channel_id', channelId)
+        .gte('start_time', startOfDay.toISOString())
+        .lt('start_time', endOfDay.toISOString())
+        .order('end_time', { ascending: false })
+        .limit(1)
+        .single();
+        
+    let lastVideoId = null;
+
+    if (existingData) {
+        const lastEnd = new Date(existingData.end_time);
+        if (lastEnd > currentStart) {
+            currentStart = lastEnd;
+        }
+        lastVideoId = existingData.video_id;
+    }
+    
+    if (currentStart >= endOfDay) {
+        throw new Error("Bu günün yayın akışı zaten dolu!");
+    }
+    
+    // 5. Generate schedule
+    const newPrograms = [];
+    const totalWeight = categories.reduce((sum: number, c: any) => sum + c.weight, 0);
+    
+    let loopCount = 0;
+    while (currentStart < endOfDay && loopCount < 500) { // Safety limit
+        loopCount++;
+        
+        let songToPlay;
+        let attempts = 0;
+        
+        // Try to pick a song that is not the same as the last one
+        do {
+            let rand = Math.random() * totalWeight;
+            let selectedCategory = categories[0].name;
+            for (const cat of categories) {
+                rand -= cat.weight;
+                if (rand <= 0) {
+                    selectedCategory = cat.name;
+                    break;
+                }
+            }
+            
+            const categorySongs = itemsByCategory[selectedCategory];
+            
+            if (!categorySongs || categorySongs.length === 0) {
+                songToPlay = eligibleItems[Math.floor(Math.random() * eligibleItems.length)];
+            } else {
+                songToPlay = categorySongs[Math.floor(Math.random() * categorySongs.length)];
+            }
+            
+            attempts++;
+        } while (songToPlay.video_id === lastVideoId && attempts < 10 && eligibleItems.length > 1);
+
+        lastVideoId = songToPlay.video_id;
+        
+        const durationMs = songToPlay.duration * 1000;
+        const newEnd = new Date(currentStart.getTime() + durationMs);
+        
+        newPrograms.push({
+            channel_id: channelId,
+            title: songToPlay.title,
+            description: `${songToPlay.category} | Dönem: ${songToPlay.era || '-'} | Vokal: ${songToPlay.vocal_type || '-'} | Enerji: ${songToPlay.energy_level}`,
+            thumbnail: `https://img.youtube.com/vi/${songToPlay.video_id}/hqdefault.jpg`,
+            video_id: songToPlay.video_id,
+            duration: songToPlay.duration,
+            start_time: currentStart.toISOString(),
+            end_time: newEnd.toISOString(),
+            creator: songToPlay.creator || 'Auto-Mixer'
+        });
+        currentStart = newEnd;
+    }
+    
+    if (newPrograms.length > 0) {
+        await addMultiplePrograms(newPrograms);
+    }
+    
+    return newPrograms;
+};
+
+// ==========================================
+// SMART MUSIC POOL API FUNCTIONS
+// ==========================================
+
+export interface PoolItem {
+    id: string;
+    video_id: string;
+    title: string;
+    creator: string | null;
+    duration: number;
+    category: string;
+    energy_level: number;
+    era: string | null;
+    vocal_type: string | null;
+    play_count: number;
+    last_played_at: string | null;
+    created_at: string;
+}
+
+export const getPoolItems = async (): Promise<PoolItem[]> => {
+    const { data, error } = await supabase
+        .from('content_pool')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+    if (error) {
+        console.error('Error fetching pool items:', error);
+        return [];
+    }
+    return data || [];
+};
+
+export const getPoolMetadata = async () => {
+    const { data, error } = await supabase
+        .from('content_pool')
+        .select('category, era, vocal_type');
+
+    if (error) {
+        console.error('Error fetching pool metadata:', error);
+        return { categories: [], eras: [], vocals: [] };
+    }
+
+    const categories = Array.from(new Set(data.map(d => d.category).filter(Boolean)));
+    const eras = Array.from(new Set(data.map(d => d.era).filter(Boolean)));
+    const vocals = Array.from(new Set(data.map(d => d.vocal_type).filter(Boolean)));
+
+    return { categories, eras, vocals };
+};
+
+export const addToPool = async (item: Omit<PoolItem, 'id' | 'play_count' | 'last_played_at' | 'created_at'>) => {
+    const { data, error } = await supabase
+        .from('content_pool')
+        .upsert([item], { onConflict: 'video_id', ignoreDuplicates: true })
+        .select()
+        .single();
+
+    if (error) {
+        console.error('Error adding to pool:', error);
+        throw error;
+    }
+    return data;
+};
+
+export const addMultipleToPool = async (items: Omit<PoolItem, 'id' | 'play_count' | 'last_played_at' | 'created_at'>[]) => {
+    const { data, error } = await supabase
+        .from('content_pool')
+        .upsert(items, { onConflict: 'video_id', ignoreDuplicates: true })
+        .select();
+
+    if (error) {
+        console.error('Error adding multiple to pool:', error);
+        throw error;
+    }
+    return data;
+};
+
+export const importPoolJSON = async (items: any[]) => {
+    // Just blindly upsert the whole array
+    const { data, error } = await supabase
+        .from('content_pool')
+        .upsert(items, { onConflict: 'video_id', ignoreDuplicates: true })
+        .select();
+
+    if (error) {
+        console.error('Error importing JSON:', error);
+        throw error;
+    }
+    return data;
+};
+
+export const updatePoolItem = async (id: string, updates: Partial<PoolItem>) => {
+    const { data, error } = await supabase
+        .from('content_pool')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+
+    if (error) {
+        console.error('Error updating pool item:', error);
+        throw error;
+    }
+    return data;
+};
+
+export const deleteFromPool = async (id: string) => {
+    const { error } = await supabase
+        .from('content_pool')
+        .delete()
+        .eq('id', id);
+
+    if (error) {
+        console.error('Error deleting from pool:', error);
         throw error;
     }
 };

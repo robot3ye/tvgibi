@@ -10,7 +10,8 @@ interface VideoInputSectionProps {
     onAdd: () => void;
     onCancel: () => void;
     onAddFiller: () => void;
-    onBulkAddClick: () => void; // New prop
+    onBulkAddClick: () => void;
+    onAutoMixerClick: () => void;
     loading: boolean;
     adding: boolean;
 }
@@ -24,6 +25,7 @@ export default function VideoInputSection({
     onCancel,
     onAddFiller,
     onBulkAddClick,
+    onAutoMixerClick,
     loading,
     adding
 }: VideoInputSectionProps) {
@@ -75,6 +77,14 @@ export default function VideoInputSection({
                         className="flex-1 lg:flex-none bg-[#FF00FF] text-white px-8 py-3 font-bold border-4 border-black hover:bg-fuchsia-600 transition-all flex items-center justify-center gap-2 text-lg"
                     >
                         <ListPlus size={20} /> Toplu
+                    </button>
+
+                    <button 
+                        onClick={onAutoMixerClick}
+                        disabled={adding}
+                        className="flex-1 lg:flex-none bg-[#00FF4F] text-black px-8 py-3 font-bold border-4 border-black hover:bg-green-400 transition-all flex items-center justify-center gap-2 text-lg disabled:opacity-50"
+                    >
+                        🤖 MİKSER
                     </button>
                 </div>
             </div>

@@ -1,0 +1,1 @@
+ALTER TABLE public.content_pool ADD CONSTRAINT content_pool_video_id_key UNIQUE (video_id);

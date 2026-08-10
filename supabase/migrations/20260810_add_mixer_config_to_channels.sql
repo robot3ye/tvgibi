@@ -1,0 +1,1 @@
+ALTER TABLE public.channels ADD COLUMN IF NOT EXISTS mixer_config JSONB DEFAULT '{}'::jsonb;

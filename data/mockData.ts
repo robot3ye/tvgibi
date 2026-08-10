@@ -16,6 +16,7 @@ export interface Channel {
   editors?: string[];
   is_online?: boolean;
   sort_order?: number;
+  mixer_config?: any;
 }
 
 export interface Program {

@@ -33,6 +33,13 @@ const extractVideoId = (url: string): string | null => {
     return (match && match[7].length === 11) ? match[7] : null;
 };
 
+// Helper to extract playlist ID from URL
+export const extractPlaylistId = (url: string): string | null => {
+    const regExp = /[?&]list=([^#\&\?]+)/;
+    const match = url.match(regExp);
+    return match ? match[1] : null;
+};
+
 export const fetchVideoDetails = async (url: string): Promise<YouTubeVideoDetails | null> => {
   const videoId = extractVideoId(url);
   
@@ -84,6 +91,55 @@ export const fetchVideoDetails = async (url: string): Promise<YouTubeVideoDetail
     console.error('Error fetching YouTube details:', error);
     return null;
   }
+};
+
+export const fetchPlaylistVideos = async (url: string, maxResults: number = 50): Promise<YouTubeVideoDetails[]> => {
+    const playlistId = extractPlaylistId(url);
+    if (!playlistId) return [];
+
+    const apiKey = process.env.NEXT_PUBLIC_YOUTUBE_API_KEY;
+    if (!apiKey) return [];
+
+    try {
+        // Step 1: Get playlist items
+        const playlistResponse = await fetch(
+            `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=${maxResults}&playlistId=${playlistId}&key=${apiKey}`
+        );
+
+        if (!playlistResponse.ok) return [];
+
+        const playlistData = await playlistResponse.json();
+        if (!playlistData.items || playlistData.items.length === 0) return [];
+
+        // Extract video IDs
+        const videoIds = playlistData.items.map((item: any) => item.snippet.resourceId.videoId).join(',');
+
+        // Step 2: Fetch full details (for durations)
+        const videosResponse = await fetch(
+            `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&id=${videoIds}&key=${apiKey}`
+        );
+
+        if (!videosResponse.ok) return [];
+
+        const videosData = await videosResponse.json();
+        
+        return videosData.items.map((item: any) => {
+            const snippet = item.snippet;
+            const contentDetails = item.contentDetails;
+            return {
+                videoId: item.id,
+                title: snippet.title,
+                description: snippet.description,
+                thumbnail: snippet.thumbnails.maxres?.url || snippet.thumbnails.high?.url || snippet.thumbnails.default?.url,
+                duration: parseDuration(contentDetails.duration),
+                creator: snippet.channelTitle
+            };
+        });
+
+    } catch (error) {
+        console.error('Error fetching playlist:', error);
+        return [];
+    }
 };
 
 export const searchYouTubeVideos = async (query: string, maxResults: number = 10): Promise<YouTubeVideoDetails[]> => {
