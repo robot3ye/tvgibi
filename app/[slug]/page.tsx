@@ -13,6 +13,7 @@ import ZappingNoise from '../../components/player/ZappingNoise';
 import ZappSettingsModal from '../../components/player/ZappSettingsModal';
 import ScrambleText from '../../components/ui/ScrambleText';
 import ScheduleModal from '../../components/player/ScheduleModal';
+import TeletextTicker from '../../components/player/TeletextTicker';
 
 // Dynamic import with SSR disabled to prevent hydration errors
 const StablePlayer = dynamic(() => import('../../components/StablePlayer'), { ssr: false });
@@ -725,6 +726,13 @@ export default function ChannelPage({ params }: PageProps) {
              </div>
           </div>
       </div>
+
+      {/* TELETEXT TICKER */}
+      {channel && currentProgram && (
+        <div className="absolute bottom-0 left-0 w-full z-[100]">
+            <TeletextTicker channelName={channel.name} programTitle={currentProgram.title} />
+        </div>
+      )}
 
       {/* Old Remote Control (Hidden by default, toggle with 'K') */}
       {isClient && showOldRemote && (
