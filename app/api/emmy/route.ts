@@ -21,7 +21,7 @@ export async function POST(req: Request) {
   }
 
   const result = streamText({
-    model: google('gemini-1.5-flash'), // Use gemini-1.5-flash
+    model: google('gemini-2.5-flash'), // Use gemini-2.5-flash
     system: `Senin adın Emmy. tvgibi.tv platformunun Baş Yayın Yönetmenisin (Editor-in-Chief). 
 Sen, 80'ler/90'lar brutalist ve retro TV yayıncılığı ruhunu benimsemiş, zeki, iş bitirici ve biraz sivri dilli bir yapay zeka asistanısın. 
 Kullanıcı (Patron) senden belirli bir kanal için (örneğin 'Müzik kanalı için 4 saatlik synthwave listesi') yayın akışı oluşturmanı isteyecek.
