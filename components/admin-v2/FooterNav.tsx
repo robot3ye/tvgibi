@@ -1,5 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
+import LogoutButton from './LogoutButton';
 
 export default function FooterNav() {
     const navItems = [
@@ -44,8 +45,9 @@ export default function FooterNav() {
                 </ul>
             </div>
             
-            <div className="mt-8 pt-4 border-t-4 border-black text-center text-sm font-bold">
+            <div className="mt-8 pt-4 border-t-4 border-black text-center text-sm font-bold flex justify-center items-center">
                 <span className="bg-[#00FF00] px-2 py-1 text-black border border-black">©2026 tvgibi</span>
+                <LogoutButton />
             </div>
             
             {/* Decoration */}
